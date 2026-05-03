@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Blind Test Party — Host</title>
+    <link rel="stylesheet" href="/host/styles.css" />
+  </head>
+  <body>
+    <!-- ══════════ TOPBAR ══════════ -->
+    <header class="topbar">
+      <!-- Zone gauche : onglets pour ouvrir/fermer les panneaux -->
+      <div class="topbar-left">
+        <div class="topbar-logo">
+          <span class="topbar-logo-text">Blind<span>Test</span></span>
+        </div>
+        <button class="tab-btn" id="tab-players" onclick="Host.Panels.toggle('players')"
+                title="Panneau Joueurs (raccourci : J)">
+          <span class="tab-icon">👥</span>
+          <span class="tab-label">Joueurs</span>
+        </button>
+        <button class="tab-btn" id="tab-playlist" onclick="Host.Panels.toggle('playlist')"
+                title="Panneau Playlist (raccourci : P)">
+          <span class="tab-icon">🎵</span>
+          <span class="tab-label">Playlist</span>
+        </button>
+      </div>
+
+      <!-- Zone droite : actions globales -->
+      <div class="topbar-right">
+        <span class="conn-indicator-topbar">
+          <span class="conn-dot" id="conn-dot"></span>
+          <span class="conn-label" id="conn-label">…</span>
+        </span>
+        <button class="btn-topbar-icon" id="btn-mode-tv"
+                onclick="Host.Panels.toggleAll()"
+                title="Mode TV : fermer tous les panneaux">
+          🖥
+        </button>
+        <button class="btn-topbar-icon" id="btn-reset-played"
+                onclick="Host.Game.resetPlayed()" disabled
+                title="Remettre tous les morceaux comme non joués">
+          ↻
+        </button>
+        <button class="btn-topbar-icon" id="btn-reset-scores"
+                onclick="Host.Players.resetScores()"
+                title="Remettre tous les scores à zéro">
+          🏆
+        </button>
+        <button class="btn-topbar-icon btn-reset-all" id="btn-reset-all"
+                onclick="Host.Game.resetAll()"
+                title="Reset complet : efface tout (joueurs, morceaux, scores, morceaux joués)">
+          🗑
+        </button>
+      </div>
+    </header>
+
+    <div class="shell">
+
+      <!-- ════════ PANNEAU GAUCHE : Joueurs ════════ -->
+      <aside class="col-players">
+        <div class="panel-header">
+          <h2 class="panel-title">Joueurs &amp; Scores</h2>
+          <button class="panel-close" onclick="Host.Panels.close('players')" title="Fermer le panneau">×</button>
+        </div>
+
+        <div class="players-section">
+          <div class="player-add-row">
+            <input
+              class="inp"
+              id="inp-player"
+              placeholder="Nom du joueur"
+              maxlength="20"
+            />
+            <button class="btn" onclick="Host.Players.addPlayer()">+</button>
+          </div>
+          <div class="players-list" id="players-list">
+            <div class="empty">Ajoute des joueurs…</div>
+          </div>
+          <div class="publish-row">
+            <button class="btn primary btn-publish" onclick="Host.Socket.publishPlayers()">
+              📡 Publier
+            </button>
+            <button class="btn btn-save-now" onclick="Host.Storage.saveNow()" title="Forcer la sauvegarde maintenant">
+              💾
+            </button>
+            <span class="publish-status" id="publish-status"></span>
+            <span class="storage-status" id="storage-status"></span>
+          </div>
+          <div class="votes-section round-active-only">
+            <div class="section-label-mini">Votes manche en cours</div>
+            <div class="votes-panel" id="votes-panel">
+              <div class="empty-mini">Aucun vote pour cette manche…</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Options de partie -->
+        <div class="options-section match-only-pregame">
+          <div class="section-label-small">Options de partie</div>
+          <label class="match-option" title="Au lancement de chaque tour, le titre, l'artiste et la pochette seront floutés jusqu'à ce que tu cliques sur le bouton 👁 dans le lecteur">
+            <input type="checkbox" id="chk-hide-indices"
+                   onchange="Host.Match.setHideIndicesByDefault(this.checked)" />
+            <span>Cacher les indices au démarrage du tour</span>
+          </label>
+          <label class="match-option" title="Quand on révèle la réponse, sauter automatiquement au moment clé du morceau pour la mise en scène. Si décoché, la musique continue depuis sa position actuelle.">
+            <input type="checkbox" id="chk-jump-on-reveal" checked
+                   onchange="Host.Match.setJumpToKeyMomentOnReveal(this.checked)" />
+            <span>Aller au moment clé au moment du reveal</span>
+          </label>
+
+          <div class="section-label-small" style="margin-top:0.6rem">Règles de scoring</div>
+          <label class="match-option" title="Toujours actif : chaque joueur qui vote correctement pour le bon owner gagne 1 point.">
+            <input type="checkbox" checked disabled />
+            <span style="color:var(--muted)">Trouveur : +1 par bonne réponse <em>(toujours actif)</em></span>
+          </label>
+          <label class="match-option" title="Si activé : un joueur (autre que l'owner) gagne 1 point pour chaque autre joueur qu'il a 'piégé' (= qui a voté pour lui).">
+            <input type="checkbox" id="chk-rule-bluffer" checked
+                   onchange="Host.Match.setRuleBluffer(this.checked)" />
+            <span>Bluffeur : +1 par joueur bluffé</span>
+          </label>
+          <label class="match-option" title="Si activé : l'owner gagne 1 point pour chaque joueur qui ne l'a pas trouvé (= qui a voté pour quelqu'un d'autre que lui).">
+            <input type="checkbox" id="chk-rule-confirm"
+                   onchange="Host.Match.setRuleConfirmation(this.checked)" />
+            <span>Piégeur : +1 par joueur n'ayant pas voté pour soi</span>
+          </label>
+        </div>
+
+        <!-- Préconfiguration : import / export du fichier playlist.json -->
+        <div class="backup-section match-only-pregame">
+          <div class="section-label-small" style="margin-bottom:0.5rem">Préconfiguration</div>
+          <div class="backup-row">
+            <input type="file" id="backup-input" accept=".json,application/json"
+                   style="display:none" onchange="Host.Storage.importJSON(this.files[0]); this.value=''" />
+            <button class="btn-backup" onclick="Host.Storage.exportJSON()"
+                    title="Sauvegarder la configuration actuelle (joueurs, morceaux, associations, moments clés) dans un fichier config-blindtest.json">
+              📥 Exporter
+            </button>
+            <button class="btn-backup" onclick="document.getElementById('backup-input').click()"
+                    title="Charger un fichier playlist.json ou config-blindtest.json (remplace la configuration actuelle)">
+              📤 Importer
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- ════════ PANNEAU DROIT : Playlist ════════ -->
+      <section class="col-playlist">
+        <div class="panel-header">
+          <h2 class="panel-title">Playlist <span class="playlist-count" id="playlist-count"></span></h2>
+          <button class="panel-close" onclick="Host.Panels.close('playlist')" title="Fermer le panneau">×</button>
+        </div>
+        <div class="load-row match-only-pregame">
+          <input
+            type="file"
+            id="file-input"
+            multiple
+            accept="audio/*"
+            style="display: none"
+            onchange="Host.Playlist.loadFiles(this)"
+          />
+          <input
+            type="file"
+            id="folder-input"
+            webkitdirectory directory
+            style="display: none"
+            onchange="Host.Playlist.loadFolder(this)"
+          />
+          <button
+            class="btn primary"
+            onclick="document.getElementById('file-input').click()"
+            title="Charger un ou plusieurs MP3 individuels"
+          >
+            ＋ Charger MP3
+          </button>
+          <button
+            class="btn"
+            onclick="document.getElementById('folder-input').click()"
+            title="Charger un dossier (avec ou sans playlist.json généré par /prepare)"
+          >
+            📁 Charger un dossier
+          </button>
+          <button class="btn" onclick="Host.Playlist.clearPlaylist()">Vider</button>
+        </div>
+        <!-- Bandeau PRE_GAME : tri + anonymisation -->
+        <div class="playlist-tools-banner match-only-pregame">
+          <div class="playlist-tools-row">
+            <span class="prb-text">Tri</span>
+            <select class="inp-mini" id="playlist-sort"
+                    onchange="Host.Playlist.setSortMode(this.value)"
+                    title="Réordonner la playlist (affichage uniquement, le tirage en jeu reste aléatoire)">
+              <option value="original">Original</option>
+              <option value="title">Titre</option>
+              <option value="artist">Artiste</option>
+              <option value="player">Joueur</option>
+              <option value="shuffle">Mélangée</option>
+            </select>
+          </div>
+          <label class="anonymize-switch" title="Cacher les pseudos des joueurs associés aux morceaux">
+            <input type="checkbox" id="chk-anonymize-pre"
+                   onchange="Host.Playlist.setAnonymized(this.checked)" />
+            <span>👤 cachés</span>
+          </label>
+        </div>
+        <div class="playlist-readonly-banner match-only-ingame">
+          <span class="prb-text">🔒 Verrouillée</span>
+          <label class="anonymize-switch" title="Cacher les pseudos des joueurs associés aux morceaux pour ne pas spoiler">
+            <input type="checkbox" id="chk-anonymize"
+                   onchange="Host.Playlist.setAnonymized(this.checked)" />
+            <span>👤 cachés</span>
+          </label>
+        </div>
+        <div class="playlist" id="playlist-el">
+          <div class="empty">Charge des fichiers audio…</div>
+        </div>
+      </section>
+
+      <!-- ════════ ZONE CENTRALE : Lecteur (toujours visible) ════════ -->
+      <section class="col-main">
+
+        <div class="player-center">
+          <!-- Vinyl -->
+          <div class="vinyl-wrap">
+            <div class="vinyl-disc" id="vinyl">
+              <div class="vinyl-disc-grooves"></div>
+              <div class="vinyl-label">
+                <img id="vinyl-art" class="vinyl-label-art" src="" alt="" />
+                <div class="vinyl-center-dot" id="vinyl-dot"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Now playing -->
+          <div class="now-playing" id="now-playing">
+            <div class="np-status" id="np-status" style="opacity: 0">
+              <div class="np-dot"></div>
+              EN LECTURE
+            </div>
+            <div class="np-title" id="np-title">—</div>
+            <div class="np-artist" id="np-artist">
+              Charge un fichier pour commencer
+            </div>
+          </div>
+
+          <!-- Controls -->
+          <div class="controls-wrap">
+            <!-- Progress -->
+            <div class="progress-area">
+              <div
+                class="progress-bar"
+                id="progress-bar"
+                onclick="Host.Controls.seekTo(event)"
+              >
+                <div class="progress-fill" id="progress-fill"></div>
+              </div>
+              <div class="progress-times">
+                <span id="time-cur">0:00</span>
+                <span id="time-tot">0:00</span>
+              </div>
+            </div>
+
+            <!-- Transport : uniquement en mode PRE_GAME pour preview -->
+            <div class="transport match-only-pregame">
+              <button class="btn-transport" onclick="Host.Controls.prevTrack()" title="Précédent">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" />
+                </svg>
+              </button>
+              <button class="btn-play-main" id="btn-play" onclick="Host.Controls.togglePlay()">
+                <svg id="ico-play" width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+                <svg id="ico-pause" width="28" height="28" viewBox="0 0 24 24" fill="currentColor" style="display: none">
+                  <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                </svg>
+              </button>
+              <button class="btn-transport" onclick="Host.Controls.nextTrack()" title="Suivant">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M6 18l8.5-6L6 6v12zM16 6h2v12h-2z" />
+                </svg>
+              </button>
+            </div>
+
+            <!-- Volume -->
+            <div class="volume-row">
+              <svg class="vol-icon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
+              </svg>
+              <input
+                type="range" class="volume-slider" id="vol-slider"
+                min="0" max="100" value="80"
+                oninput="Host.Controls.setVolume(this.value)"
+              />
+              <span class="vol-val" id="vol-val">80%</span>
+            </div>
+
+            <!-- Ligne d'actions : Moment clé + Toggle indices -->
+            <div class="key-moment-row">
+              <button
+                class="btn-key-moment" id="btn-km"
+                onclick="Host.Controls.jumpToKeyMoment()"
+                disabled
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z" />
+                </svg>
+                Moment clé
+                <span class="key-moment-time" id="km-time-display"></span>
+              </button>
+              <button
+                class="btn-set-km match-only-pregame"
+                onclick="Host.Controls.setKeyMoment()"
+                title="Définir le moment clé au timecode actuel"
+              >
+                ⏺ Définir ici
+              </button>
+              <!-- Toggle indices (titre/artiste/pochette) — uniquement IN_GAME -->
+              <button
+                class="btn-toggle-indices match-only-ingame" id="btn-toggle-indices"
+                onclick="Host.Match.toggleIndices()"
+                title="Afficher/cacher les indices"
+              >
+                <svg class="eye-open" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/>
+                </svg>
+                <svg class="eye-closed" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="display:none">
+                  <path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/>
+                </svg>
+              </button>
+            </div>
+
+          </div>
+          <!-- /controls-wrap -->
+        </div>
+        <!-- /player-center -->
+
+        <!-- Game controls : adaptatif selon l'état Match -->
+        <div class="game-controls">
+          <div class="game-status-row">
+            <span class="game-counter" id="remaining-count">Aucun morceau chargé</span>
+            <span class="game-status" id="game-status"></span>
+          </div>
+          <div class="game-buttons">
+            <!-- État PRE_GAME : bouton "Démarrer la partie" -->
+            <button class="btn-game-action btn-start-match match-only-pregame" id="btn-start-match"
+                    onclick="Host.Match.showStartDialog()"
+                    title="Verrouiller la configuration et démarrer la partie">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8 5v14l11-7z"/>
+              </svg>
+              Démarrer la partie
+            </button>
+
+            <!-- État IN_GAME : Lancer un tour OU Révéler la réponse (jamais les deux) -->
+            <button class="btn-game-action btn-launch-round round-idle-only" id="btn-launch-round"
+                    onclick="Host.Game.startNewRound()" disabled
+                    title="Tire un morceau au hasard parmi les non joués et lance le tour pour les joueurs">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+              </svg>
+              Lancer le morceau suivant
+            </button>
+            <button class="btn-game-action btn-reveal-main round-active-only" id="btn-reveal" onclick="Host.Reveal.open()">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/>
+              </svg>
+              Révéler la réponse
+            </button>
+
+            <!-- Bouton Pause (visible pendant TOUTE la partie : round idle ET active) -->
+            <button class="btn-pause-soiree match-only-ingame" id="btn-pause-soiree"
+                    onclick="Host.Controls.togglePlay()" title="Pause / Lecture">
+              <svg id="ico-pause-soiree" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+              </svg>
+              <svg id="ico-play-soiree" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="display:none">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- Bouton Terminer la partie (subtil, en dessous, IN_GAME uniquement) -->
+          <button class="btn-end-match match-only-ingame" onclick="Host.Match.endMatchManual()"
+                  title="Sortir de la partie en cours et afficher les scores">
+            Terminer la partie
+          </button>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ══════════ GLOBAL CANVASES (visualizer + confetti) ══════════ -->
+    <canvas id="viz-canvas"></canvas>
+    <canvas id="confetti-canvas"></canvas>
+
+    <!-- ══════════ REVEAL OVERLAY ══════════ -->
+    <div class="overlay" id="overlay" onclick="Host.Reveal.close(event)">
+      <div class="reveal-card" id="reveal-card">
+        <div class="reveal-card-inner">
+
+          <!-- Colonne gauche : la réponse -->
+          <div class="reveal-col-left">
+            <div class="reveal-art-zone" id="reveal-art-zone">
+              <div class="reveal-art-placeholder" id="reveal-art-placeholder">
+                🎵
+              </div>
+            </div>
+            <div class="reveal-info">
+              <div class="reveal-label">Morceau</div>
+              <div class="reveal-title" id="rc-title">—</div>
+              <div class="reveal-artist" id="rc-artist">—</div>
+              <div class="reveal-divider"></div>
+              <div class="reveal-player-row">
+                <div class="reveal-player-dot" id="rc-dot"></div>
+                <div>
+                  <div class="reveal-player-label">Choisi par</div>
+                  <div class="reveal-player-name" id="rc-player">—</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Colonne droite : scoring -->
+          <div class="reveal-col-right">
+            <div class="scoring-panel" id="scoring-panel"></div>
+            <div class="reveal-footer">
+              <button class="btn" onclick="Host.Scoring.cancel()">Annuler</button>
+              <button class="btn primary" id="btn-validate-scores" onclick="Host.Scoring.applyScores()" disabled>
+                ✓ Valider les points
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ TRACK EDIT MODAL ══════════ -->
+    <div class="modal-overlay" id="edit-modal">
+      <div class="modal">
+        <div class="modal-title">Configurer le morceau</div>
+        <div class="form-group">
+          <label class="form-label">Joueur associé</label>
+          <select class="inp" id="edit-player"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Moment clé (secondes)</label>
+          <input
+            type="number" class="inp" id="edit-km"
+            placeholder="ex: 45" min="0"
+          />
+        </div>
+        <div class="modal-footer">
+          <button class="btn" onclick="Host.EditModal.close()">Annuler</button>
+          <button class="btn primary" onclick="Host.EditModal.save()">
+            Enregistrer
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ MATCH START DIALOG ══════════ -->
+    <div class="match-dialog-overlay" id="match-start-dialog">
+      <div class="match-dialog">
+        <div class="match-dialog-icon">▶</div>
+        <h2 class="match-dialog-title">Démarrer la partie ?</h2>
+        <div class="match-dialog-stats">
+          <div class="msd-stat">
+            <span class="msd-num" id="msd-players-connected">0</span>
+            <span class="msd-label">connectés sur <span id="msd-players-total">0</span></span>
+          </div>
+          <div class="msd-stat">
+            <span class="msd-num" id="msd-tracks">0</span>
+            <span class="msd-label">morceaux prêts</span>
+          </div>
+        </div>
+        <div class="msd-warning" id="msd-warning" style="display:none"></div>
+        <p class="match-dialog-text">
+          Une fois la partie lancée, la playlist devient en lecture seule
+          (plus de modification possible). Tu pourras la consulter via le panneau
+          🎵 Playlist mais sans pouvoir cliquer dessus.
+        </p>
+        <div class="match-dialog-footer">
+          <button class="btn" onclick="Host.Match.closeStartDialog()">Annuler</button>
+          <button class="btn primary" onclick="Host.Match.confirmStart()">
+            ▶ Démarrer
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ END SCREEN ══════════ -->
+    <div class="end-screen-overlay" id="end-screen"></div>
+
+    <audio id="audio"></audio>
+
+    <!-- ═══ Scripts ═══ -->
+    <!-- Socket.io client (servi par le serveur) — sera utilisé en étape 4.B -->
+    <script src="/socket.io/socket.io.js"></script>
+    <!-- Constantes et utilitaires partagés -->
+    <script src="/shared/events.js"></script>
+    <script src="/shared/utils.js"></script>
+    <!-- Modules Host (ordre important : state d'abord, app en dernier) -->
+    <script src="/host/modules/state.js"></script>
+    <script src="/host/modules/storage.js"></script>
+    <script src="/host/modules/panels.js"></script>
+    <script src="/host/modules/audio-engine.js"></script>
+    <script src="/host/modules/players.js"></script>
+    <script src="/host/modules/playlist.js"></script>
+    <script src="/host/modules/controls.js"></script>
+    <script src="/host/modules/visualizer.js"></script>
+    <script src="/host/modules/confetti.js"></script>
+    <script src="/host/modules/edit-modal.js"></script>
+    <script src="/host/modules/reveal.js"></script>
+    <script src="/host/modules/keyboard.js"></script>
+    <script src="/host/modules/socket.js"></script>
+    <script src="/host/modules/game.js"></script>
+    <script src="/host/modules/match.js"></script>
+    <script src="/host/modules/scoring.js"></script>
+    <script src="/host/app.js"></script>
+  </body>
+</html>

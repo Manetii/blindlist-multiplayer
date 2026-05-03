@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#080b10" />
+    <meta name="format-detection" content="telephone=no" />
+    <title>Blind Test — Joueur</title>
+    <link rel="stylesheet" href="/player/styles.css" />
+  </head>
+  <body>
+
+    <!-- ═══ HEADER permanent (pseudo + score) ═══ -->
+    <header class="player-header" id="player-header">
+      <div class="header-id">
+        <span class="header-dot" id="header-dot"></span>
+        <span class="header-name" id="header-name">—</span>
+      </div>
+      <div class="header-score-wrap">
+        <span class="header-score-label">Score</span>
+        <span class="header-score" id="header-score">0</span>
+      </div>
+    </header>
+
+    <!-- ═══ Bannière déconnexion ═══ -->
+    <div class="connection-banner" id="connection-banner">
+      <span class="cb-dot"></span>
+      Connexion perdue · reconnexion en cours…
+    </div>
+
+    <!-- ═══ ÉCRAN 1 — JOIN ═══ -->
+    <section class="screen" data-screen="join">
+      <div class="join-hero">
+        <div class="join-mark">
+          <span class="join-mark-bar"></span>
+          <span class="join-mark-bar"></span>
+          <span class="join-mark-bar"></span>
+        </div>
+        <h1 class="join-title">Blind<span>Test</span></h1>
+        <p class="join-tagline">Choisis ton pseudo pour rejoindre la partie</p>
+      </div>
+
+      <p class="join-empty" id="join-empty" style="display:none">
+        En attente que le Host crée des joueurs…
+      </p>
+      <div class="join-list" id="join-list"></div>
+      <p class="join-error" id="join-error"></p>
+    </section>
+
+    <!-- ═══ ÉCRAN 2 — WAITING ═══ -->
+    <section class="screen" data-screen="waiting">
+      <div class="waiting-vinyl">
+        <div class="waiting-vinyl-inner"></div>
+        <div class="waiting-vinyl-dot"></div>
+      </div>
+      <h2 class="waiting-title" id="waiting-title">En attente</h2>
+      <p class="waiting-sub" id="waiting-sub">Le Host va lancer le prochain morceau…</p>
+      <div class="waiting-pulse">
+        <span></span><span></span><span></span>
+      </div>
+      <!-- Bouton Changer de pseudo, visible uniquement avant le 1er tour -->
+      <button class="btn-change-pseudo" id="btn-change-pseudo" style="display:none">
+        ← Changer de pseudo
+      </button>
+    </section>
+
+    <!-- ═══ ÉCRAN 3 — VOTE ═══ -->
+    <section class="screen" data-screen="vote">
+      <div class="vote-header">
+        <p class="vote-prompt-label">DEVINE</p>
+        <h2 class="vote-prompt">Qui a choisi ce morceau ?</h2>
+      </div>
+
+      <div class="vote-grid" id="vote-grid"></div>
+
+      <div class="vote-status" id="vote-status"></div>
+
+      <button class="vote-validate-btn" id="vote-validate-btn" disabled>
+        Choisis un joueur
+      </button>
+    </section>
+
+    <!-- ═══ ÉCRAN 4 — REVEAL ═══ -->
+    <section class="screen" data-screen="reveal">
+      <div class="reveal-card">
+        <div class="reveal-art-zone">
+          <div class="reveal-art-placeholder" id="reveal-art-placeholder">🎵</div>
+          <img class="reveal-art-img" id="reveal-art" alt="" />
+        </div>
+
+        <div class="reveal-info">
+          <p class="reveal-label">Le morceau était</p>
+          <h2 class="reveal-title" id="reveal-title">—</h2>
+          <p class="reveal-artist" id="reveal-artist">—</p>
+
+          <div class="reveal-divider"></div>
+
+          <p class="reveal-label">Choisi par</p>
+          <div class="reveal-player-row">
+            <span class="reveal-player-dot" id="reveal-player-dot"></span>
+            <span class="reveal-player-name" id="reveal-player">—</span>
+          </div>
+        </div>
+
+        <div class="reveal-verdict" id="reveal-verdict"></div>
+      </div>
+
+      <p class="reveal-next">En attente de la prochaine manche…</p>
+    </section>
+
+    <!-- ═══ Scripts ═══ -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/shared/events.js"></script>
+    <script src="/shared/utils.js"></script>
+    <script src="/player/modules/screens.js"></script>
+    <script src="/player/modules/header.js"></script>
+    <script src="/player/modules/socket.js"></script>
+    <script src="/player/modules/waiting-screen.js"></script>
+    <script src="/player/modules/game-state.js"></script>
+    <script src="/player/modules/join-screen.js"></script>
+    <script src="/player/modules/vote-screen.js"></script>
+    <script src="/player/modules/reveal-screen.js"></script>
+    <script src="/player/app.js"></script>
+  </body>
+</html>

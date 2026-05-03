@@ -1,0 +1,25 @@
+{
+  "name": "blindtest-multiplayer",
+  "version": "1.0.0",
+  "description": "Blind Test Party - application multijoueur avec Host et clients mobiles",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "node --watch server/server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  },
+  "keywords": [
+    "blindtest",
+    "music",
+    "party",
+    "multiplayer",
+    "websocket"
+  ],
+  "license": "MIT"
+}
