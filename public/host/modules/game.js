@@ -47,7 +47,6 @@ Host.Game = (() => {
     // Marquer le tour comme actif (cache "Lancer un nouveau tour", montre "Révéler")
     if (Host.Match) Host.Match.markRoundStarted();
 
-    flashGameStatus(`Tour lancé !`, 'success');
     updateGameButtons();
   }
 

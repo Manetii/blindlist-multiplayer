@@ -196,6 +196,23 @@ Host.Controls = (() => {
       btn.disabled = true;
       display.textContent = "";
     }
+    updateKmMarker();
+  }
+
+  /** Met à jour la position du marqueur de moment clé sur la barre. */
+  function updateKmMarker() {
+    const S      = Host.State;
+    const marker = document.getElementById("progress-km-marker");
+    if (!marker) return;
+    const t = S.currentIdx >= 0 ? S.tracks[S.currentIdx] : null;
+    const dur = S.audio ? S.audio.duration : NaN;
+    if (t && t.keyMoment !== null && dur && !isNaN(dur) && dur > 0) {
+      const pct = Math.min(100, (t.keyMoment / dur) * 100);
+      marker.style.display = "block";
+      marker.style.left = pct + "%";
+    } else {
+      marker.style.display = "none";
+    }
   }
 
   /** Branche les événements de l'élément <audio>. */
@@ -207,6 +224,11 @@ Host.Controls = (() => {
       document.getElementById("progress-fill").style.width = pct + "%";
       document.getElementById("time-cur").textContent = SharedUtils.fmt(S.audio.currentTime);
       document.getElementById("time-tot").textContent = SharedUtils.fmt(S.audio.duration);
+    });
+
+    // Quand la durée devient disponible, on peut positionner le marqueur
+    S.audio.addEventListener("durationchange", () => {
+      updateKmMarker();
     });
 
     S.audio.addEventListener("ended", () => {
@@ -240,44 +262,62 @@ Host.Controls = (() => {
 
   /** Coupe la musique en cours, vide la source, reset le titre/artiste
    *  à un état neutre "En attente". Utilisé au démarrage de la partie
-   *  pour stopper la preview et préparer le premier tour. */
+   *  pour stopper la preview et préparer le premier tour, et au retour
+   *  en PRE_GAME depuis l'écran de fin. */
   function stopAndClear() {
     const S = Host.State;
-    // Couper l'audio proprement
-    try {
-      S.audio.pause();
-      S.audio.removeAttribute('src');
-      S.audio.load();
-    } catch (e) {}
 
-    // Reset l'index courant
-    S.currentIdx = -1;
+    // Si l'audio joue et qu'on a un GainNode, on fait un fade out rapide
+    // avant de couper — évite le clic/saut brutal
+    const doStop = () => {
+      try {
+        S.audio.pause();
+        S.audio.removeAttribute('src');
+        S.audio.load();
+      } catch (e) {}
 
-    // Reset l'UI
-    document.getElementById("np-title").textContent  = "En attente…";
-    document.getElementById("np-artist").textContent = "Lance le premier tour pour commencer";
-    document.getElementById("progress-fill").style.width = "0%";
-    document.getElementById("time-cur").textContent = "0:00";
-    document.getElementById("time-tot").textContent = "0:00";
+      S.currentIdx = -1;
 
-    // Reset visuel du vinyle
-    const vinyl = document.getElementById("vinyl");
-    if (vinyl) vinyl.classList.remove("spinning");
+      document.getElementById("np-title").textContent  = "En attente…";
+      document.getElementById("np-artist").textContent = "Lance le premier tour pour commencer";
+      document.getElementById("progress-fill").style.width = "0%";
+      document.getElementById("time-cur").textContent = "0:00";
+      document.getElementById("time-tot").textContent = "0:00";
+      const marker = document.getElementById("progress-km-marker");
+      if (marker) marker.style.display = "none";
 
-    // Pochette
-    const vinylArt = document.getElementById("vinyl-art");
-    if (vinylArt) {
-      vinylArt.style.display = "none";
-      vinylArt.src = "";
+      const vinyl = document.getElementById("vinyl");
+      if (vinyl) vinyl.classList.remove("spinning");
+
+      const vinylArt = document.getElementById("vinyl-art");
+      if (vinylArt) { vinylArt.style.display = "none"; vinylArt.src = ""; }
+      const dot = document.getElementById("vinyl-dot");
+      if (dot) dot.style.display = "block";
+
+      const artBg = document.getElementById("art-bg");
+      if (artBg) { artBg.style.backgroundImage = ""; artBg.classList.remove("visible"); }
+
+      setPlayState(false);
+      updateKeyMomentUI();
+      if (Host.Playlist) Host.Playlist.render();
+
+      // Restaurer le gain pour la prochaine lecture
+      if (S.gainNode && S.audioCtx) {
+        S.gainNode.gain.setValueAtTime(S.audio.volume, S.audioCtx.currentTime);
+      }
+    };
+
+    if (!S.audio.paused && S.gainNode && S.audioCtx) {
+      // Fade out en 0.6s puis stop
+      const FADE = 0.6;
+      const now  = S.audioCtx.currentTime;
+      S.gainNode.gain.cancelScheduledValues(now);
+      S.gainNode.gain.setValueAtTime(S.gainNode.gain.value, now);
+      S.gainNode.gain.linearRampToValueAtTime(0, now + FADE);
+      setTimeout(doStop, FADE * 1000);
+    } else {
+      doStop();
     }
-    const dot = document.getElementById("vinyl-dot");
-    if (dot) dot.style.display = "block";
-
-    setPlayState(false);
-    updateKeyMomentUI();
-
-    // Re-render la playlist pour retirer la classe "active"
-    if (Host.Playlist) Host.Playlist.render();
   }
 
   return {

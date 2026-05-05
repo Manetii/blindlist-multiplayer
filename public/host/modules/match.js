@@ -176,6 +176,8 @@ Host.Match = (() => {
   function dismissEndScreen() {
     // Arrête les confettis lancés par renderEndScreen
     if (Host.Confetti) Host.Confetti.stopConfetti();
+    // Coupe la musique proprement
+    if (Host.Controls) Host.Controls.stopAndClear();
     setState(STATES.PRE_GAME);
   }
 
