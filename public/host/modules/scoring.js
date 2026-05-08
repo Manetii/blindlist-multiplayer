@@ -59,9 +59,12 @@ Host.Scoring = (() => {
     // ═══ R2 — Bluffeur (optionnel) ═══
     // Un non-owner gagne +1 pour CHAQUE joueur qui a voté pour lui
     // (modifié : auparavant +1 fixe si au moins 1 vote, désormais +1 par bluffé)
+    // Note : le vote de l'owner lui-même est exclu — il vote "blanc" pour
+    // ne pas paraître suspect, son vote ne doit pas générer de points bluffeur.
     if (rules.bluffer) {
       const votesByCandidate = new Map();  // candidate -> count
-      votes.forEach(({ voted }) => {
+      votes.forEach(({ voter, voted }) => {
+        if (voter === ownerName) return;   // ignorer le vote de l'owner
         votesByCandidate.set(voted, (votesByCandidate.get(voted) || 0) + 1);
       });
 
