@@ -1,157 +1,114 @@
 /**
  * ════════════════════════════════════════════════════════════════
- *  SERVEUR BLIND TEST PARTY
+ *  SERVEUR BLIND TEST PARTY — phase 2
  * ════════════════════════════════════════════════════════════════
  *
- *  Routes :
- *    GET /             → vue Host (protégée si HOST_PASSWORD défini)
- *    GET /login        → page de login Host
- *    POST /login       → validation du mot de passe
- *    POST /logout      → déconnexion Host
- *    GET /player       → vue Joueur (jamais protégée)
- *    GET /prepare      → outil de préparation (protégé comme le Host)
- *    GET /health       → healthcheck Render
- *    WS  /             → WebSocket Socket.io
+ *  PAGES
+ *    /                 accueil : créer / rejoindre / reprendre
+ *    /login            accès administration (si ADMIN_PASSWORD défini)
+ *    /h                console hôte (PC)
+ *    /h/:code          console d'une soirée
+ *    /prepare          vérification des fichiers
+ *    /admin            supervision                 — protégée
+ *    /j/:code          choisir son nom dans la liste
+ *    /p/:code/:token   espace participant (lien magique)
+ *    /r/:code          entrée joueur par QR
  *
- *  Sécurité Host :
- *    Si HOST_PASSWORD est défini dans les variables d'environnement,
- *    l'accès à / et /prepare requiert un cookie de session valide.
- *    Si HOST_PASSWORD n'est PAS défini, aucune protection (mode local).
+ *  API
+ *    /api/host/*       console hôte      (X-Host-Token)
+ *    /api/*            participant       (X-Participant-Token)
+ *    /api/admin/*      supervision       (ADMIN_PASSWORD)
  *
- *    Test en local :
- *      HOST_PASSWORD=monmotdepasse npm start
- *
- *    Sur Render :
- *      Dashboard → ton service → Environment → Add Environment Variable
- *      Key: HOST_PASSWORD  Value: ton_mot_de_passe
+ *  Les pages ne portent AUCUN secret. Les jetons circulent en en-tête,
+ *  jamais en query string : une URL finit dans les logs, l'historique
+ *  et l'en-tête Referer. Le lien magique fait exception par nécessité —
+ *  c'est le prix de l'absence de mot de passe — d'où le noindex posé
+ *  sur ces pages.
  * ════════════════════════════════════════════════════════════════
  */
 
 const express      = require('express');
 const http         = require('http');
-const { Server }   = require('socket.io');
 const path         = require('path');
 const cookieParser = require('cookie-parser');
-const crypto       = require('crypto');
+const { Server }   = require('socket.io');
 
-const gameState        = require('./game-state');
+const db     = require('./db');
+const Rooms  = require('./rooms');
+const auth   = require('./lib/auth');
 const registerHandlers = require('./socket-handlers');
+const notify           = require('./lib/notify');
 
-const PORT          = process.env.PORT          || 3000;
-const HOST_PASSWORD = process.env.HOST_PASSWORD || null;
+const hostRoutes   = require('./routes/host.routes');
+const playerRoutes = require('./routes/player.routes');
+const adminRoutes  = require('./routes/admin.routes');
+const searchRoutes = require('./routes/search.routes');
 
-// Secret aléatoire pour signer les tokens — regénéré à chaque boot du serveur
-// (invalide les sessions existantes, acceptable pour cet usage)
-const SESSION_SECRET      = crypto.randomBytes(32).toString('hex');
-const SESSION_DURATION_MS = 12 * 60 * 60 * 1000;  // 12h
+const PORT   = process.env.PORT || 3000;
+
+/**
+ * Origine publique du service, pour le contrôle CORS en production.
+ * Render fournit RENDER_EXTERNAL_URL automatiquement ; APP_ORIGIN
+ * permet de la surcharger sur un autre hébergeur.
+ */
+const PUBLIC_ORIGIN = (process.env.APP_ORIGIN || process.env.RENDER_EXTERNAL_URL || '')
+  .replace(/\/$/, '');
+const PUBLIC = path.join(__dirname, '..', 'public');
 
 const app    = express();
 const server = http.createServer(app);
+/**
+ * CORS des WebSocket.
+ *
+ * En développement on accepte tout : l'hôte ouvre sa console sur
+ * localhost pendant que les téléphones passent par l'IP locale, deux
+ * origines différentes pour le même serveur.
+ *
+ * En production, les clients sont servis par ce serveur : aucune autre
+ * origine n'a de raison légitime d'ouvrir un socket. Restreindre évite
+ * qu'un site tiers pilote un salon depuis le navigateur d'un visiteur.
+ */
 const io     = new Server(server, {
-  cors: { origin: '*' },
+  cors: process.env.NODE_ENV === 'production'
+    ? { origin: (origin, cb) => cb(null, !origin || origin === PUBLIC_ORIGIN), credentials: true }
+    : { origin: '*' },
+  // Détection des sockets morts. Les valeurs par défaut (25 s + 20 s)
+  // laissent un fantôme occuper une place près de 45 s — bien au-delà
+  // du sursis de 10 s sur lequel reposent les décomptes.
+  pingInterval: 8000,
+  pingTimeout:  10000,
 });
 
+app.set('trust proxy', 1);
+app.set('port', PORT);            // Render / reverse proxy
+// 4 Mo : une vignette de pochette pèse ~30 Ko, et un appariement peut
+// en porter plusieurs dizaines d'un coup.
+app.use(express.json({ limit: '4mb' }));
 app.use(express.urlencoded({ extended: false }));
-app.use(express.json());
 app.use(cookieParser());
 
-// ─── Auth helpers ──────────────────────────────────────────────
-
-function makeSessionToken() {
-  const expires = Date.now() + SESSION_DURATION_MS;
-  const payload = `host:${expires}`;
-  const sig = crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('hex');
-  return Buffer.from(`${payload}:${sig}`).toString('base64');
-}
-
-function verifySessionToken(token) {
-  if (!token) return false;
-  try {
-    const raw = Buffer.from(token, 'base64').toString('utf8');
-    const lastColon = raw.lastIndexOf(':');
-    const payload = raw.slice(0, lastColon);
-    const sig     = raw.slice(lastColon + 1);
-    const expected = crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('hex');
-    if (sig !== expected) return false;
-    const expires = parseInt(payload.split(':')[1], 10);
-    return Date.now() < expires;
-  } catch {
-    return false;
-  }
-}
-
-function requireHostAuth(req, res, next) {
-  if (!HOST_PASSWORD) return next();
-  if (verifySessionToken(req.cookies['host_session'])) return next();
-  res.redirect('/login?next=' + encodeURIComponent(req.originalUrl));
-}
-
-// ─── Page de login ─────────────────────────────────────────────
+// ─── Porte globale ─────────────────────────────────────────────
 
 app.get('/login', (req, res) => {
-  if (!HOST_PASSWORD) return res.redirect('/');
-  if (verifySessionToken(req.cookies['host_session'])) {
-    return res.redirect(req.query.next || '/');
+  if (!auth.ADMIN_PASSWORD) return res.redirect('/');
+  if (auth.verifySessionToken(req.cookies.host_session)) {
+    return res.redirect(safeNext(req.query.next));
   }
-
-  const error   = req.query.error === '1' ? '<p class="error">Mot de passe incorrect.</p>' : '';
-  const nextUrl = req.query.next || '/';
-
-  res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.send(`<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>Blind Test — Accès Host</title>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@400;600&display=swap');
-    :root{--bg:#080b10;--surface:#0f141c;--border:#1e2a3a;--accent:#00e5ff;--accent2:#ff6b6b;--text:#e8f0fe;--muted:#5a7080}
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center}
-    .card{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:2.5rem 2rem;width:340px;box-shadow:0 30px 80px rgba(0,0,0,.7)}
-    .logo{font-family:'Bebas Neue',sans-serif;font-size:2rem;letter-spacing:.15em;color:var(--accent);text-shadow:0 0 20px rgba(0,229,255,.4);margin-bottom:.25rem}
-    .logo span{color:var(--text)}
-    .subtitle{font-size:.7rem;letter-spacing:.25em;color:var(--muted);text-transform:uppercase;margin-bottom:2rem}
-    label{display:block;font-size:.65rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:.35rem}
-    input[type=password]{width:100%;background:#161d28;border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:1rem;padding:.65rem .9rem;outline:none;transition:border-color .2s;margin-bottom:1.25rem}
-    input[type=password]:focus{border-color:var(--accent)}
-    button{width:100%;background:var(--accent);border:none;border-radius:8px;color:#080b10;font-family:'Outfit',sans-serif;font-size:.95rem;font-weight:600;padding:.75rem;cursor:pointer;transition:background .18s}
-    button:hover{background:#33eaff}
-    .error{color:var(--accent2);font-size:.82rem;margin-bottom:1rem}
-  </style>
-</head>
-<body>
-  <div class="card">
-    <div class="logo">Blind<span>Test</span></div>
-    <div class="subtitle">Accès présentateur</div>
-    ${error}
-    <form method="POST" action="/login">
-      <input type="hidden" name="next" value="${nextUrl}"/>
-      <label for="pwd">Mot de passe</label>
-      <input type="password" id="pwd" name="password" autofocus autocomplete="current-password"/>
-      <button type="submit">Entrer</button>
-    </form>
-  </div>
-</body>
-</html>`);
+  res.sendFile(path.join(PUBLIC, 'login', 'index.html'));
 });
 
 app.post('/login', (req, res) => {
-  if (!HOST_PASSWORD) return res.redirect('/');
-  const { password, next } = req.body;
-  const target = (next && next.startsWith('/')) ? next : '/';
+  if (!auth.ADMIN_PASSWORD) return res.redirect('/');
+  const target = safeNext(req.body.next);
 
-  if (password !== HOST_PASSWORD) {
+  if (req.body.password !== auth.ADMIN_PASSWORD) {
     return res.redirect('/login?error=1&next=' + encodeURIComponent(target));
   }
-
-  const token = makeSessionToken();
-  res.cookie('host_session', token, {
+  res.cookie('host_session', auth.makeSessionToken('admin'), {
     httpOnly: true,
     sameSite: 'lax',
-    secure:   process.env.NODE_ENV === 'production',
-    maxAge:   SESSION_DURATION_MS,
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: auth.SESSION_DURATION_MS,
   });
   res.redirect(target);
 });
@@ -161,54 +118,170 @@ app.post('/logout', (req, res) => {
   res.redirect('/login');
 });
 
-// ─── Routes principales ────────────────────────────────────────
+/** Empêche une redirection ouverte via ?next=https://ailleurs. */
+function safeNext(value) {
+  const v = String(value || '/');
+  return v.startsWith('/') && !v.startsWith('//') ? v : '/';
+}
 
-app.get('/', requireHostAuth, (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'host', 'index.html'));
-});
+// ─── API ───────────────────────────────────────────────────────
 
-app.get('/player', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'player', 'index.html'));
-});
+app.use('/api/host',  hostRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api',       searchRoutes);
+app.use('/api',       playerRoutes);
 
-app.get('/prepare', requireHostAuth, (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'prepare', 'index.html'));
-});
+// ─── Pages ─────────────────────────────────────────────────────
 
-// ─── Fichiers statiques ───────────────────────────────────────
+const page = (dir) => (req, res) => res.sendFile(path.join(PUBLIC, dir, 'index.html'));
 
-app.use('/shared',  express.static(path.join(__dirname, '..', 'public', 'shared')));
-app.use('/host',    express.static(path.join(__dirname, '..', 'public', 'host')));
-app.use('/player',  express.static(path.join(__dirname, '..', 'public', 'player')));
-app.use('/prepare', express.static(path.join(__dirname, '..', 'public', 'prepare')));
+app.get('/', page('home'));
 
-// ─── Healthcheck ──────────────────────────────────────────────
+// Pages hôte OUVERTES : la console ne montre rien sans le hostToken
+// que le navigateur détient, et l'API le vérifie à chaque requête.
+app.get('/h',        page('host'));
+app.get('/h/:code',  page('host'));
+// Console de jeu : plus spécifique que /h/:code, donc déclarée après —
+// Express retient la première route qui correspond, et /h/:code ne
+// capture pas un second segment.
+app.get('/h/:code/play', page('play'));
+app.get('/prepare',  page('prepare'));
+app.get('/admin',    auth.requireAdminPage, page('admin'));
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', uptime: process.uptime() });
-});
+/**
+ * Pages participant. Aucune validation du code ni du jeton ici : le
+ * serveur HTTP ne doit pas révéler quels codes existent. La
+ * vérification se fait par l'API une fois la page chargée.
+ */
+const noIndex = (req, res, next) => {
+  res.set('X-Robots-Tag', 'noindex, nofollow');
+  next();
+};
 
-// ─── WebSocket ────────────────────────────────────────────────
+app.get('/j/:code',        page('player'));
+app.get('/r/:code',        page('player'));
+app.get('/p/:code/:token', noIndex, page('player'));
+app.get('/player',         page('player'));
 
-io.on('connection', (socket) => {
-  console.log(`[+] Connexion : ${socket.id}`);
-  registerHandlers(io, socket, gameState);
+// ─── Statique ──────────────────────────────────────────────────
 
-  socket.on('disconnect', () => {
-    console.log(`[-] Déconnexion : ${socket.id}`);
-    gameState.markDisconnected(socket.id);
-    io.emit(require('../public/shared/events').STATE_PLAYERS, gameState.publicPlayers());
+for (const dir of ['shared', 'home', 'host', 'play', 'player', 'prepare', 'admin', 'login']) {
+  app.use(`/${dir}`, express.static(path.join(PUBLIC, dir)));
+}
+
+// ─── Santé ─────────────────────────────────────────────────────
+
+app.get('/health', async (req, res) => {
+  const dbOk = await db.ping().catch(() => false);
+  res.status(dbOk ? 200 : 503).json({
+    status: dbOk ? 'ok' : 'degraded',
+    uptime: Math.round(process.uptime()),
+    db: dbOk,
+    ...Rooms.stats(),
   });
 });
 
-server.listen(PORT, () => {
-  const authMode = HOST_PASSWORD
-    ? '🔒 Mot de passe actif'
-    : '🔓 Sans protection (HOST_PASSWORD non défini)';
-  console.log(`╔═══════════════════════════════════════════╗`);
-  console.log(`║  🎵 Blind Test Party — server up          ║`);
-  console.log(`║  Host    :  http://localhost:${PORT}         ║`);
-  console.log(`║  Player  :  http://localhost:${PORT}/player  ║`);
-  console.log(`║  Auth    :  ${authMode.padEnd(29)} ║`);
-  console.log(`╚═══════════════════════════════════════════╝`);
+// ─── Erreurs ───────────────────────────────────────────────────
+
+app.use((req, res) => res.status(404).json({ error: 'Route inconnue.' }));
+
+app.use((err, req, res, _next) => {
+  // Les erreurs de contrainte remontent avec un code PostgreSQL : on
+  // les traduit plutôt que de renvoyer un 500 opaque.
+  if (err.code === '23505') {
+    return res.status(409).json({ error: 'Cette valeur existe déjà.' });
+  }
+  if (err.code === '22P02' || err.code === '23514') {
+    return res.status(400).json({ error: 'Donnée invalide.' });
+  }
+  console.error('[http]', err.stack || err.message);
+  res.status(500).json({ error: 'Erreur serveur.' });
 });
+
+// ─── WebSocket ─────────────────────────────────────────────────
+
+notify.attach(io);
+
+io.on('connection', (socket) => {
+  registerHandlers(io, socket);
+});
+
+// ─── Démarrage ─────────────────────────────────────────────────
+
+async function start() {
+  // Refuser de démarrer sans base plutôt que d'accepter des requêtes
+  // qui échoueront toutes une par une.
+  const dbOk = await db.ping().catch(() => false);
+  if (!dbOk) {
+    console.error('[boot] Base inaccessible. Vérifie DATABASE_URL.');
+    process.exit(1);
+  }
+
+  // Une migration en retard ne se manifeste sinon qu'à la première
+  // requête concernée, sous la forme d'un « la colonne X n'existe
+  // pas » en pleine utilisation. Autant le dire tout de suite, avec
+  // la commande à taper.
+  try {
+    const pending = (await require('./db/migrate').status())
+      .filter(m => m.state !== 'appliquée');
+    if (pending.length) {
+      console.error(
+        `\n[boot] ${pending.length} migration(s) en attente :\n` +
+        pending.map(m => `         ${m.state.padEnd(22)} ${m.name}`).join('\n') +
+        '\n\n       Lance : npm run migrate\n'
+      );
+      process.exit(1);
+    }
+  } catch (err) {
+    console.warn('[boot] Impossible de vérifier les migrations :', err.message);
+  }
+
+  // Un défaut de configuration silencieux est pire qu'une erreur : sans
+  // ADMIN_PASSWORD, quiconque anime une partie peut supprimer toutes
+  // les soirées. On le dit fort.
+  if (!auth.ADMIN_PASSWORD) {
+    console.warn(
+      '\n⚠  ADMIN_PASSWORD non défini : /admin s\'ouvre SANS MOT DE PASSE.\n' +
+      '   Cette page voit et supprime toutes les soirées du serveur.\n' +
+      '   Ajoute ADMIN_PASSWORD=… dans ton fichier .env, puis redémarre.\n'
+    );
+  }
+
+  Rooms.startSweeper();
+
+  server.listen(PORT, () => {
+    const adminGate = auth.ADMIN_PASSWORD ? 'mot de passe actif' : 'SANS PROTECTION';
+    // Largeur intérieure fixe : le padEnd des lignes précédentes se
+    // décalait dès que le numéro de port changeait de longueur.
+    const W = 44;
+    const line = (s) => '║ ' + s.padEnd(W - 2) + '║';
+    console.log('╔' + '═'.repeat(W) + '╗');
+    // Pas d'émoji ici : sa largeur d'affichage varie d'un terminal à
+    // l'autre (une ou deux colonnes), et aucun calcul de remplissage
+    // n'est alors correct partout.
+    console.log(line('BLIND TEST PARTY'));
+    console.log(line(''));
+    console.log(line(`Accueil   http://localhost:${PORT}`));
+    console.log(line(`Console   http://localhost:${PORT}/h`));
+    console.log(line(`Admin     ${adminGate}`));
+    console.log('╚' + '═'.repeat(W) + '╝');
+  });
+}
+
+/** Arrêt propre : Render envoie SIGTERM avant de tuer le process. */
+function shutdown(signal) {
+  console.log(`\n[boot] ${signal} — arrêt en cours…`);
+  Rooms.stopSweeper();
+  io.close();
+  server.close(() => {
+    db.close().finally(() => process.exit(0));
+  });
+  setTimeout(() => process.exit(1), 8000).unref();
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT',  () => shutdown('SIGINT'));
+
+if (require.main === module) start();
+
+module.exports = { app, server, io, start };

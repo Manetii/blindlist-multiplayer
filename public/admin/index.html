@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Blind Test — Supervision</title>
+<link rel="stylesheet" href="/shared/base.css">
+<link rel="stylesheet" href="/host/styles.css">
+<style>
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit,minmax(120px,1fr)); gap: .6rem; margin-bottom: 1.25rem; }
+  .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: .8rem 1rem; }
+  .kpi .v { font-family: 'Bebas Neue',sans-serif; font-size: 1.7rem; color: var(--accent); line-height: 1; }
+  .kpi .k { font-size: .62rem; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); margin-top: .2rem; }
+  .live { color: var(--ok); }
+  details.detail { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: .45rem; }
+  details.detail > summary { padding: .7rem .9rem; cursor: pointer; display: flex; align-items: center; gap: .75rem; list-style: none; }
+  details.detail > summary::-webkit-details-marker { display: none; }
+  details.detail > summary::before { content: '▸'; color: var(--muted); }
+  details.detail[open] > summary::before { content: '▾'; }
+  details.detail .body { padding: 0 .9rem .9rem; border-top: 1px solid var(--border); }
+  .pcode { font-family: 'Bebas Neue',sans-serif; font-size: 1.2rem; letter-spacing: .16em; color: var(--accent); }
+  .danger-zone { border-color: #4a1a1a; margin-top: 2rem; }
+  pre.raw { font-size: .68rem; color: var(--muted); overflow-x: auto; background: var(--bg); padding: .6rem; border-radius: 8px; margin-top: .6rem; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="mark"><span></span><span></span><span></span></div>
+  <div>
+    <div class="party-name">Supervision</div>
+    <div class="eyebrow" id="server-line">…</div>
+  </div>
+  <div style="margin-left:auto;display:flex;gap:.5rem">
+    <a class="btn ghost sm" href="/h">Console</a>
+    <button class="btn ghost sm" id="refresh">Rafraîchir</button>
+    <form method="POST" action="/logout"><button class="btn ghost sm" type="submit">Déconnexion</button></form>
+  </div>
+</header>
+
+<div class="wrap">
+  <div id="security-warning"></div>
+  <div class="kpis" id="kpis"></div>
+
+  <div class="card-head"><h2>Soirées</h2><span class="count" id="p-count">0</span></div>
+  <div id="parties" class="stack"></div>
+
+  <div class="card danger-zone">
+    <div class="card-head"><h2 style="color:var(--danger)">Zone de test</h2></div>
+    <p class="muted small">
+      Supprime <b>toutes</b> les soirées et leurs données. Irréversible.
+      Sert à repartir d'une base propre après une modification de code.
+    </p>
+    <button class="btn danger" id="reset-all" style="margin-top:.8rem">Tout supprimer</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/admin/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Blind Test — Administration</title>
+<link rel="stylesheet" href="/shared/base.css">
+<style>
+  body { display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
+  .box { width: 100%; max-width: 340px; }
+  .head { display: flex; align-items: center; gap: .75rem; margin-bottom: 1.75rem; }
+  form > * + * { margin-top: .9rem; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <div class="head">
+      <div class="mark"><span></span><span></span><span></span></div>
+      <div>
+        <div class="title" style="font-size:1.6rem">Blind<span>Test</span></div>
+        <div class="eyebrow" id="scope-label">Accès administration</div>
+      </div>
+    </div>
+
+    <p class="error" id="err"></p>
+
+    <form method="POST" action="/login">
+      <input type="hidden" name="next" id="next" value="/h">
+      <div>
+        <label class="lbl" for="pwd">Mot de passe</label>
+        <input class="field" type="password" id="pwd" name="password" autofocus autocomplete="current-password">
+      </div>
+      <button class="btn full" type="submit">Entrer</button>
+    </form>
+
+    <p class="muted small" style="margin-top:1.5rem">
+      Cette page ne sert qu'à l'administration du serveur. Créer un salon et
+      l'animer ne demande aucun mot de passe : chaque salon est protégé par
+      son propre jeton.
+    </p>
+  </div>
+
+<script>
+  const q = new URLSearchParams(location.search);
+  if (q.get('error')) {
+    const e = document.getElementById('err');
+    e.textContent = 'Mot de passe incorrect.';
+    e.classList.add('shake');
+  }
+  const next = q.get('next');
+  if (next && next.startsWith('/') && !next.startsWith('//')) {
+    document.getElementById('next').value = next;
+  }
+</script>
+</body>
+</html>

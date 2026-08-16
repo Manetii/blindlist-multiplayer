@@ -1,26 +1,27 @@
 {
-  "name": "blindtest-multiplayer",
-  "version": "1.0.0",
-  "description": "Blind Test Party - application multijoueur avec Host et clients mobiles",
+  "name": "blindtest-party",
+  "version": "2.0.0",
+  "private": true,
   "main": "server/server.js",
   "scripts": {
     "start": "node server/server.js",
-    "dev": "node --watch server/server.js"
-  },
-  "engines": {
-    "node": ">=18.0.0"
+    "dev": "node --watch server/server.js",
+    "migrate": "node server/db/migrate.js",
+    "migrate:status": "node server/db/migrate.js --status",
+    "test": "ADMIN_PASSWORD=adminsecret node server/test/lifecycle.test.js && node server/test/session.test.js && node server/test/realtime.test.js && node server/test/http.test.js && node server/test/participant.test.js && node server/test/submission.test.js && node server/test/admin.test.js && node server/test/game.test.js && node server/test/options.test.js && node server/test/matching.test.js && node server/test/resolution.test.js && node server/test/appariement.test.js && node server/test/url-playlist.test.js && node server/test/correctifs.test.js && node server/test/todo.test.js && node server/test/sauvegarde.test.js && node server/test/reglages.test.js && node server/test/rythme.test.js && node server/test/persistance.test.js && node server/test/etapes.test.js && node server/test/finitions.test.js && node server/test/deploiement.test.js && node server/test/ergonomie.test.js && node server/test/portage.test.js && node server/test/pages.test.js",
+    "migrate:repair": "node server/db/migrate.js --repair"
   },
   "dependencies": {
-    "cookie-parser": "^1.4.7",
+    "cookie-parser": "^1.4.6",
+    "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "pg": "^8.11.5",
     "socket.io": "^4.7.5"
   },
-  "keywords": [
-    "blindtest",
-    "music",
-    "party",
-    "multiplayer",
-    "websocket"
-  ],
-  "license": "MIT"
+  "devDependencies": {
+    "socket.io-client": "^4.7.5"
+  },
+  "engines": {
+    "node": ">=18"
+  }
 }
