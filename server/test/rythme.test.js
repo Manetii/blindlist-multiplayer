@@ -87,7 +87,7 @@ ok('musique NON coupee au reveal', !yj.includes('AudioEngine.stop()') || yj.incl
 ok('jukebox (ecoute libre)', yj.includes('function preview')&&yj.includes('Écoute libre'));
 ok('jukebox seulement hors partie', yj.includes('function jukeboxOpen'));
 ok('pas de bouton lancer par morceau', !yj.includes('data-play'));
-ok('nouvelle partie depuis la playlist', yh.includes('Nouvelle partie'));
+ok('rejouer la playlist, hors du pied de panneau', yh.includes('Rejouer toute la playlist')&&yh.includes('end-actions'));
 ok('vocabulaire lecteur/console', yh.includes('Retour à la console'));
 ok('pas de bouton couper', !yh.includes('id="btn-stop"'));
 ok('page unique : plus d ecran dossier', !yh.includes('data-view="folder"'));

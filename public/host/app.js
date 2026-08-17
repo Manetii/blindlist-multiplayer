@@ -146,13 +146,17 @@
     err.textContent = '';
 
     if (!name) { err.textContent = 'Donne un nom à la soirée.'; return; }
-    const min = parseInt($('#np-min').value, 10);
-    const max = parseInt($('#np-max').value, 10);
-    if (min > max) { err.textContent = 'Le minimum ne peut pas dépasser le maximum.'; return; }
 
     $('#np-create').disabled = true;
+    // Le quota se règle dans la console : c'est un paramètre du
+    // fonctionnement de la soirée, pas de sa création, et l'hôte doit
+    // pouvoir l'ajuster en voyant où en sont les paniers.
+    //
+    // selfRegistration est acquis : demander à l'hôte de saisir les
+    // pseudos à la place des joueurs faisait double emploi avec l'écran
+    // d'arrivée, qui gère déjà les homonymes.
     const { ok, data } = await api('POST', '/api/host/parties', {
-      name, minTracks: min, maxTracks: max,
+      name, selfRegistration: true,
     });
     $('#np-create').disabled = false;
 
@@ -192,6 +196,9 @@
 
     render();
     view('console');
+    // Le plancher du quota arrive après coup : il ne conditionne pas
+    // l'affichage, seulement la borne basse du champ.
+    loadQuotaFloor();
 
     const t = new Date();
     $('#c-refreshed').textContent =
@@ -219,6 +226,15 @@
     }, 20000);
   }
 
+  /**
+   * Plancher du quota. Chargé à part : il dépend des paniers, pas de la
+   * soirée, et une seconde de retard sur cette ligne ne gêne personne.
+   */
+  async function loadQuotaFloor() {
+    const { ok, data } = await api('GET', `/api/host/parties/${state.code}/quota-floor`);
+    if (ok) { state.quotaFloor = data; renderQuota(); }
+  }
+
   function render() {
     const p = state.party;
     $('#c-name').textContent = p.name;
@@ -229,7 +245,8 @@
     renderQR(shareUrl());
     checkNetwork();
 
-    $('#opt-self-reg').checked = p.allow_self_registration === true;
+    renderQuota();
+    renderGameOptions();
     renderSteps();
     renderPeople();
     renderProgress();
@@ -315,10 +332,12 @@
    *  la complétion pendant la validation. Le fil met simplement en
    *  avant l'étape que l'état de la soirée désigne.
    * ════════════════════════════════════════════════════════════ */
+  //  « Prête » nommait un ÉTAT, pas une tâche, et ne contenait qu'un
+  //  bouton. Les trois libellés désignent maintenant trois actions.
   const STEPS = [
-    { label: 'Collecte',   title: 'Participants et morceaux' },
-    { label: 'Validation', title: 'Arbitrage, verrouillage et fichiers' },
-    { label: 'Prête',      title: 'Lancer la soirée' },
+    { label: 'Collecte', title: 'Participants, quota et verrouillage' },
+    { label: 'Fichiers', title: 'Récupérer et apparier les morceaux' },
+    { label: 'Options',  title: 'Règles de jeu et lancement' },
   ];
 
   /** Étape que l'état de la soirée désigne comme courante. */
@@ -331,6 +350,21 @@
   let currentStep = null;
   let lastNatural = null;
 
+  /**
+   * Etape demandee par l'URL (?step=N).
+   *
+   * C'est ce qui permet au lecteur de renvoyer vers l'etape de
+   * lancement plutot que vers le haut de la console. Lue UNE fois, au
+   * chargement : passe ce point, la navigation de l'hote prime.
+   */
+  function stepFromUrl() {
+    const raw = new URLSearchParams(location.search).get('step');
+    if (raw === null) return null;
+    const n = Number(raw);
+    return Number.isInteger(n) && n >= 0 && n < STEPS.length ? n : null;
+  }
+  let requestedStep = stepFromUrl();
+
   function renderSteps() {
     const natural = stepOfState(state.party.state);
 
@@ -340,6 +374,10 @@
     // après une partie terminée était impossible : le rendu suivant
     // ramenait aussitôt à la dernière étape.
     if (currentStep === null || natural !== lastNatural) currentStep = natural;
+    // Une etape demandee par l'URL l'emporte sur l'etape naturelle, mais
+    // une seule fois : sans cela, chaque rendu ramenerait l'hote a
+    // l'etape du lien et rendrait le fil inutilisable.
+    if (requestedStep !== null) { currentStep = requestedStep; requestedStep = null; }
     lastNatural = natural;
 
     $('#c-steps').innerHTML = STEPS.map((s, k) => {
@@ -358,9 +396,11 @@
       el.classList.toggle('hidden', Number(el.dataset.step) !== currentStep);
     });
 
-    // Les doublons n'ont d'intérêt que s'il y en a.
+    // Les doublons n'ont d'intérêt que s'il y en a. Ils appartiennent à
+    // la collecte : c'est le verrouillage qui fige la playlist, donc
+    // c'est avant lui qu'il faut trancher.
     $('#s-dupes').classList.toggle('hidden',
-      currentStep !== 1 || state.duplicates.length === 0);
+      currentStep !== 0 || state.duplicates.length === 0);
 
     if (['prete', 'terminee'].includes(state.party.state)) {
       $('#play-btn').href = `/h/${state.party.code}/play`;
@@ -400,29 +440,6 @@
     el.querySelectorAll('[data-release]').forEach(b => b.addEventListener('click', () => releasePerson(b.dataset.release)));
   }
 
-  async function addPerson() {
-    const input = $('#p-name');
-    const name = input.value.trim();
-    const err = $('#p-error');
-    err.textContent = '';
-    if (!name) return;
-
-    const { ok, data } = await api('POST', `/api/host/parties/${state.code}/participants`, { displayName: name });
-    if (!ok) {
-      // Conflit : on propose des variantes plutôt qu'un refus sec, et on
-      // pré-remplit la première pour que l'hôte n'ait qu'à valider.
-      err.textContent = data.error || 'Ajout impossible.';
-      if (data.suggestions && data.suggestions.length) {
-        input.value = data.suggestions[0];
-        input.select();
-        err.textContent += ` Essaie « ${data.suggestions.join(' », « ')} ».`;
-      }
-      return;
-    }
-    input.value = '';
-    input.focus();
-    await loadConsole();
-  }
 
   async function removePerson(id) {
     const p = state.participants.find(x => x.id === id);
@@ -501,6 +518,98 @@
         await loadConsole();
       });
     });
+  }
+
+  // ─── Quota et estimation ────────────────────────────────────
+
+  /**
+   * Champs de quota, plancher et estimation de charge.
+   *
+   * Le plancher est affiché SOUS le champ plutôt que découvert au
+   * moment du refus : une contrainte qu'on ne voit qu'en la heurtant
+   * passe pour un bug.
+   */
+  function renderQuota() {
+    const p = state.party;
+    const collecting = p.state === 'collecte';
+
+    $('#q-min').value = p.min_tracks_per_person;
+    $('#q-max').value = p.max_tracks_per_person;
+    $('#q-min').disabled = !collecting;
+    $('#q-max').disabled = !collecting;
+
+    const floor = state.quotaFloor || { ceiling: 0, holders: [] };
+    $('#q-max').min = Math.max(1, floor.ceiling);
+    $('#q-floor').textContent = floor.ceiling
+      ? `Pas moins de ${floor.ceiling} : ${floor.holders.join(', ')} ${
+          floor.holders.length > 1 ? 'ont' : 'a'} déjà ce nombre.`
+      : '';
+
+    renderEstimate();
+  }
+
+  /**
+   * Ce que le quota engage réellement.
+   *
+   * Choisir « 6 maximum » sans savoir que cela fait 36 fichiers à
+   * réunir et trois heures de jeu, c'est choisir à l'aveugle. On compte
+   * environ trois minutes par manche : extrait, votes, révélation et
+   * la discussion qui va avec.
+   */
+  const MINUTES_PER_ROUND = 3;
+
+  function renderEstimate() {
+    const people = state.participants.length;
+    const max = state.party.max_tracks_per_person;
+    const el = $('#q-estimate');
+
+    if (!people) {
+      el.textContent = 'Partage le lien : l\'estimation apparaîtra dès les premières arrivées.';
+      return;
+    }
+    const rounds = people * max;
+    const minutes = rounds * MINUTES_PER_ROUND;
+    const h = Math.floor(minutes / 60), m = minutes % 60;
+    const duration = h ? `${h} h${m ? String(m).padStart(2, '0') : ''}` : `${m} min`;
+    el.innerHTML =
+      `<span>${people} participant${people > 1 ? 's' : ''} × ${max} morceaux ` +
+      `= <b>${rounds} manches</b> · environ <b>${duration}</b> de jeu · ` +
+      `<b>${rounds} fichiers</b> à réunir.</span>`;
+  }
+
+  /** Écrit un réglage, en remontant le motif du refus s'il y en a un. */
+  async function saveSetting(patch, okMsg = 'Réglage enregistré.') {
+    const { ok, data } = await api('PATCH', `/api/host/parties/${state.code}/settings`, patch);
+    if (!ok) {
+      // Le serveur peut refuser avec un motif précis — un quota sous un
+      // panier déjà rempli. « Impossible » laisserait l'hôte sans rien
+      // pour corriger.
+      toast((data && data.error) || 'Enregistrement impossible.', true);
+      await loadConsole();
+      return false;
+    }
+    toast(okMsg);
+    await loadConsole();
+    return true;
+  }
+
+  // ─── Options de jeu ─────────────────────────────────────────
+
+  /**
+   * Les règles vivent ici, plus sur l'écran de jeu.
+   *
+   * Un réglage persisté en base est une propriété de la soirée ; l'écran
+   * de jeu ne garde que ce qui relève de la mise en scène — le bouton
+   * œil et l'anonymisation.
+   */
+  function renderGameOptions() {
+    const p = state.party;
+    $('#opt-hide-indices').checked  = p.hide_indices_default !== false;
+    $('#opt-rule-bluffer').checked  = p.rule_bluffer_enabled !== false;
+    $('#opt-rule-trapper').checked  = p.rule_trapper_enabled === true;
+    const pct = p.key_moment_pct === undefined ? 25 : p.key_moment_pct;
+    $('#opt-key-moment').value = pct;
+    $('#opt-key-moment-val').textContent = `${pct} %`;
   }
 
   // ─── Verrouillage ───────────────────────────────────────────
@@ -1047,13 +1156,26 @@
     $('#np-create').addEventListener('click', createParty);
     $('#np-name').addEventListener('keydown', e => { if (e.key === 'Enter') createParty(); });
 
-    $('#p-add').addEventListener('click', addPerson);
-    $('#opt-self-reg').addEventListener('change', async (e) => {
-      const { ok } = await api('PATCH', `/api/host/parties/${state.code}/settings`,
-                               { selfRegistration: e.target.checked });
-      toast(ok ? 'Réglage enregistré.' : 'Enregistrement impossible.', !ok);
+    // Quota : on écrit sur « change », pas sur chaque frappe.
+    $('#q-min').addEventListener('change', (e) =>
+      saveSetting({ minTracks: Number(e.target.value) }, 'Minimum enregistré.'));
+    $('#q-max').addEventListener('change', (e) =>
+      saveSetting({ maxTracks: Number(e.target.value) }, 'Maximum enregistré.'));
+
+    // Options de jeu.
+    $('#opt-hide-indices').addEventListener('change', (e) =>
+      saveSetting({ hideIndices: e.target.checked }));
+    $('#opt-rule-bluffer').addEventListener('change', (e) =>
+      saveSetting({ blufferRule: e.target.checked }));
+    $('#opt-rule-trapper').addEventListener('change', (e) =>
+      saveSetting({ trapperRule: e.target.checked }));
+    // input pour le retour visuel immédiat, change pour l'écriture :
+    // enregistrer à chaque pixel de glissement noierait le serveur.
+    $('#opt-key-moment').addEventListener('input', (e) => {
+      $('#opt-key-moment-val').textContent = `${e.target.value} %`;
     });
-    $('#p-name').addEventListener('keydown', e => { if (e.key === 'Enter') addPerson(); });
+    $('#opt-key-moment').addEventListener('change', (e) =>
+      saveSetting({ keyMomentPct: Number(e.target.value) }));
 
     $('#step-prev').addEventListener('click', () => goStep(currentStep - 1));
     $('#step-next').addEventListener('click', () => goStep(currentStep + 1));

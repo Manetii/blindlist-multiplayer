@@ -40,10 +40,21 @@ function partyChanged(code, state, extra = {}) {
   io.to(channel(code)).emit('state:party-changed', { state, ...extra });
 }
 
+/**
+ * Les réglages de la soirée ont changé.
+ *
+ * Émis vers le SALON (canal `<code>`), pas vers le canal de soirée : le
+ * lecteur y est attaché, et c'est lui qui applique les règles.
+ */
+function settingsChanged(code, settings) {
+  if (!io || !code) return;
+  io.to(String(code).toUpperCase()).emit('state:settings', { settings });
+}
+
 /** Le salon vient d'ouvrir ou de fermer. */
 function roomChanged(code, open) {
   if (!io || !code) return;
   io.to(channel(code)).emit('state:party-changed', { roomOpen: open });
 }
 
-module.exports = { attach, partyChanged, roomChanged, channel };
+module.exports = { attach, partyChanged, roomChanged, settingsChanged, channel };

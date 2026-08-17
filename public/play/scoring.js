@@ -10,10 +10,11 @@
  *    R1 TROUVEUR  (toujours actif)
  *       +1 à chaque joueur ayant désigné le bon proposant.
  *
- *    R2 BLUFFEUR  (toujours actif)
+ *    R2 BLUFFEUR  (optionnel, actif par défaut)
  *       +1 au joueur désigné à tort, par vote erroné reçu. Son goût
  *       musical a été jugé compatible avec un morceau qui n'est pas
  *       le sien — c'est ce qui récompense un profil difficile à cerner.
+ *       Le vote du proposant ne compte pas : il connaît la réponse.
  *
  *    R3 PIÉGEUR   (optionnel, réglage de la soirée)
  *       +1 au proposant si PERSONNE ne l'a trouvé. Récompense un
@@ -55,10 +56,20 @@ window.Scoring = (() => {
         events.push({ participantId: v.voterId, points: 1, reason: 'finder' });
         finders++;
       } else if (opts.blufferRule !== false) {
-        // R2 — le joueur désigné à tort encaisse. Le proposant lui-même
-        // est exclu : recevoir un vote erroné alors qu'on est la bonne
-        // réponse n'a pas de sens.
-        if (v.votedId && v.votedId !== ownerId) {
+        // R2 — le joueur désigné à tort encaisse.
+        //
+        // DEUX exclusions, pas une :
+        //
+        //   - le proposant comme CIBLE : recevoir un vote erroné alors
+        //     qu'on est la bonne réponse n'a pas de sens ;
+        //
+        //   - le proposant comme VOTANT. Il connaît la réponse, et la
+        //     grille l'empêche de se désigner lui-même : son vote est
+        //     donc forcément faux, et il l'émet pour ne pas paraître
+        //     suspect. Le compter revenait à lui laisser offrir un
+        //     point à qui il voulait. La v1 excluait ce cas ; le
+        //     portage v2 l'avait perdu.
+        if (v.votedId && v.votedId !== ownerId && v.voterId !== ownerId) {
           events.push({ participantId: v.votedId, points: 1, reason: 'bluffer' });
         }
       }

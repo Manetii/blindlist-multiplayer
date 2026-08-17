@@ -102,7 +102,7 @@ router.post('/join/:code/register', joinLimit,
     if (!party) return res.status(404).json({ error: 'Aucune soirée avec ce code.' });
     if (!party.allow_self_registration) {
       return res.status(403).json({
-        error: 'L\'hôte crée lui-même la liste — choisis ton nom dedans.',
+        error: 'Les inscriptions sont closes pour cette soirée.',
       });
     }
     const created = await participantRepo.create(party.id, req.body.displayName);

@@ -52,9 +52,14 @@ const rooms = new Map();
  * plafond à 50 s : assez pour dépasser n'importe quelle intro, jamais
  * assez pour se perdre au milieu.
  */
-function skipIntroOffsetMs(durationMs) {
+function skipIntroOffsetMs(durationMs, pct = 25) {
   if (!durationMs || durationMs < 30_000) return 0;
-  return Math.round(Math.min(durationMs * 0.25, 50_000));
+  const share = Math.min(50, Math.max(0, Number(pct)));
+  if (!share) return 0;
+  // Plafond absolu conservé : sur un morceau de huit minutes, 25 %
+  // placeraient le départ à deux minutes — bien après le moment où la
+  // salle a décroché.
+  return Math.round(Math.min(durationMs * (share / 100), 50_000));
 }
 
 // ─── Ouverture / fermeture ──────────────────────────────────────
@@ -114,7 +119,7 @@ async function openRoom(party, hostSocketId) {
       blufferRule: party.rule_bluffer_enabled,
       trapperRule: party.rule_trapper_enabled,
       hideIndices: party.hide_indices_default,
-      startAtKeyMoment: party.start_at_key_moment,
+      keyMomentPct: party.key_moment_pct,
     },
 
     // Map<participantId, joueur>
@@ -192,7 +197,7 @@ function applySettings(code, party) {
     blufferRule: party.rule_bluffer_enabled,
     trapperRule: party.rule_trapper_enabled,
     hideIndices: party.hide_indices_default,
-    startAtKeyMoment: party.start_at_key_moment,
+    keyMomentPct: party.key_moment_pct,
   };
   room.lastActivity = Date.now();
   return true;
@@ -289,10 +294,11 @@ async function startRound(room, trackId) {
   if (!track) return { ok: false, reason: 'Morceau absent de cette playlist.' };
 
   // Démarrer au début est un choix de soirée : certaines intros sont
-  // justement la partie la plus reconnaissable.
-  const startOffsetMs = room.settings.startAtKeyMoment === false
-    ? 0
-    : skipIntroOffsetMs(track.duration_ms);
+  // justement la partie la plus reconnaissable. 0 % exprime ce choix.
+  const startOffsetMs = skipIntroOffsetMs(
+    track.duration_ms,
+    room.settings.keyMomentPct === undefined ? 25 : room.settings.keyMomentPct
+  );
   const round = await sessionRepo.startRound(room.sessionId, track.id, startOffsetMs);
 
   room.round = {

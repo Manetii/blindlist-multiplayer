@@ -8,21 +8,21 @@
    fichier — bandeau des « prêts » et podium.
    ════════════════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600&display=swap');
+/* Jetons de design, reset, fontes et primitives viennent de la base
+   commune. Ce fichier ne contenait aucun de ces éléments : il en
+   portait sa propre copie, avec des NOMS DIFFERENTS pour les memes
+   couleurs (--accent2 pour le rouge, --accent3 pour le jaune,
+   --success pour le vert). Tout composant deplace depuis une autre vue
+   y perdait donc ses couleurs en silence. */
+@import url('/shared/base.css');
 
-:root {
-  --bg: #080b10; --surface: #0f141c; --surface2: #161d28; --border: #1e2a3a;
-  --accent: #00e5ff; --accent2: #ff6b6b; --accent3: #ffd166;
-  --text: #e8f0fe; --muted: #5a7080; --success: #06d6a0; --radius: 12px;
-}
-* { box-sizing: border-box; margin: 0; padding: 0; }
 body {
-  background: var(--bg); color: var(--text);
-  font-family: 'Outfit', system-ui, sans-serif;
-  height: 100vh; overflow: hidden;
+  /* 100dvh et non 100vh : sur mobile, 100vh ignore la barre d'URL, le
+     bas de l'interface est coupe et overflow:hidden interdit d'aller
+     le rechercher. Le reste du projet utilise deja dvh. */
+  height: 100dvh; overflow: hidden;
   display: flex; flex-direction: column;
 }
-.hidden { display: none !important; }
 .view { display: none; flex: 1; min-height: 0; }
 .view.active { display: flex; }
 
@@ -55,14 +55,15 @@ body {
 .topbar-right { display: flex; align-items: center; gap: .7rem; }
 .room-code {
   font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem;
-  letter-spacing: .22em; color: var(--accent); text-indent: .22em;
+  /* Demi-valeur du letter-spacing : voir .code dans host/styles.css. */
+  letter-spacing: .22em; color: var(--accent); text-indent: .11em;
 }
 .conn-indicator {
   display: flex; align-items: center; gap: .4rem;
   font-size: .6rem; letter-spacing: .15em; text-transform: uppercase; color: var(--muted);
 }
-.conn-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent2); }
-.conn-dot.on { background: var(--success); box-shadow: 0 0 8px var(--success); }
+.conn-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--danger); }
+.conn-dot.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
 
 .btn-topbar-icon {
   width: 36px; height: 36px; background: var(--surface);
@@ -71,7 +72,7 @@ body {
   display: flex; align-items: center; justify-content: center;
   transition: all .2s; text-decoration: none;
 }
-.btn-topbar-icon:hover { border-color: var(--accent3); color: var(--accent3); }
+.btn-topbar-icon:hover { border-color: var(--warn); color: var(--warn); }
 
 /* ─── MISE EN PAGE ─── */
 .layout {
@@ -105,7 +106,7 @@ body.panel-playlist-open .col-playlist { transform: translateX(0); opacity: 1; }
   background: none; border: none; color: var(--muted);
   font-size: 1.2rem; line-height: 1; cursor: pointer; padding: 0 .2rem;
 }
-.panel-close:hover { color: var(--accent2); }
+.panel-close:hover { color: var(--danger); }
 .panel-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.05rem; letter-spacing: .1em; font-weight: 400; }
 .playlist-count { color: var(--accent); }
 .panel-body { flex: 1; overflow-y: auto; padding: .75rem 1rem; display: flex; flex-direction: column; gap: .35rem; }
@@ -199,7 +200,7 @@ body.indices-hidden .vinyl-label-art { filter: blur(20px) brightness(.3) !import
 }
 .btn-toggle-indices:hover { background: rgba(0,229,255,.2); border-color: var(--accent); }
 body.indices-hidden .btn-toggle-indices {
-  background: rgba(255,209,102,.15); border-color: rgba(255,209,102,.4); color: var(--accent3);
+  background: rgba(255,209,102,.15); border-color: rgba(255,209,102,.4); color: var(--warn);
 }
 
 /* ─── CONTRÔLES ─── */
@@ -216,6 +217,24 @@ body.indices-hidden .btn-toggle-indices {
 }
 
 .volume-row { display: flex; align-items: center; gap: .6rem; }
+
+/* Volume : sorti du flux central. On le règle une fois, en début de
+   soirée ; le garder entre le vinyle et les boutons d'action revenait à
+   donner à un réglage la place d'une commande. */
+.volume-corner {
+  position: absolute; right: 1rem; bottom: 1rem; z-index: 2;
+  display: flex; align-items: center; gap: .5rem;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 999px; padding: .35rem .75rem; opacity: .55;
+  transition: opacity .2s;
+}
+.volume-corner:hover, .volume-corner:focus-within { opacity: 1; }
+.volume-corner .volume-slider { width: 90px; }
+.volume-corner .vol-val { font-size: .7rem; color: var(--muted); min-width: 3.5ch; }
+
+/* Les deux sorties de partie, groupées et discrètes : ni l'une ni
+   l'autre ne doit se cliquer par inadvertance. */
+.end-actions { display: flex; flex-direction: column; align-items: center; gap: .15rem; }
 .vol-icon { font-size: .9rem; color: var(--muted); }
 .volume-slider { flex: 1; accent-color: var(--accent); height: 4px; }
 .vol-val { font-family: 'Bebas Neue', sans-serif; font-size: .85rem; color: var(--muted); min-width: 3ch; }
@@ -229,19 +248,18 @@ body.indices-hidden .btn-toggle-indices {
 .btn-key-moment:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
 .btn-key-moment:disabled { opacity: .35; cursor: not-allowed; }
 
-.game-status-row {
-  display: flex; align-items: center; justify-content: center;
-  min-height: 1.4rem; font-size: .75rem; letter-spacing: .1em;
-}
-.game-counter { color: var(--muted); font-family: 'Bebas Neue', sans-serif; font-size: .95rem; letter-spacing: .15em; }
+/* .game-status-row a disparu : le compteur de progression a rejoint la
+   rangée des compteurs, qui parlent tous du même sujet — où en est la
+   table. Deux gabarits pour deux chiffres côte à côte n'avaient pas de
+   raison d'être. */
 /* Ligne propre, plus de positionnement absolu : le message se
    superposait au compteur de morceaux joués dès qu'il était long. */
 .game-status {
   text-align: center; font-size: .78rem; color: var(--muted);
   min-height: 1.2em; padding: 0 .5rem;
 }
-.game-status.success { color: var(--success); font-weight: 600; }
-.game-status.error { color: var(--accent2); font-weight: 600; }
+.game-status.success { color: var(--ok); font-weight: 600; }
+.game-status.error { color: var(--danger); font-weight: 600; }
 
 .game-buttons { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; justify-content: center; }
 
@@ -265,7 +283,7 @@ body.indices-hidden .btn-toggle-indices {
   box-shadow: 0 0 30px rgba(0,229,255,.4), 0 8px 24px rgba(0,0,0,.5);
 }
 .btn-game-action.btn-reveal-main {
-  background: linear-gradient(135deg, var(--accent2), #f72585); color: #fff; border-color: transparent;
+  background: linear-gradient(135deg, var(--danger), #f72585); color: #fff; border-color: transparent;
   box-shadow: 0 0 30px rgba(255,107,107,.45), 0 8px 24px rgba(0,0,0,.5);
 }
 
@@ -281,7 +299,7 @@ body.indices-hidden .btn-toggle-indices {
   font-family: 'Outfit', sans-serif; font-size: .78rem;
   cursor: pointer; padding: .4rem; opacity: .6; transition: opacity .2s;
 }
-.btn-end-match:hover { opacity: 1; color: var(--accent2); }
+.btn-end-match:hover { opacity: 1; color: var(--danger); }
 
 /* ─── LISTES ─── */
 .player-item, .track-item {
@@ -292,22 +310,22 @@ body.indices-hidden .btn-toggle-indices {
 .player-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
 .player-item .grow, .track-item .grow { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .player-item.offline { opacity: .4; }
-.player-item.ready { border-color: var(--success); }
+.player-item.ready { border-color: var(--ok); }
 .player-score { font-family: 'Bebas Neue', sans-serif; color: var(--accent); font-size: 1rem; }
 .tag-mini {
   font-size: .58rem; letter-spacing: .12em; text-transform: uppercase;
   color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: .05rem .45rem;
 }
-.tag-mini.ok { color: var(--success); border-color: #17553f; }
+.tag-mini.ok { color: var(--ok); border-color: #17553f; }
 
 .track-item { cursor: pointer; transition: all .15s; }
 .track-item:hover:not(.absent) { border-color: var(--accent); }
 .track-idx { font-family: 'Bebas Neue', sans-serif; color: var(--muted); width: 2rem; flex-shrink: 0; }
 .track-item.played { opacity: .5; }
-.track-item.played .track-idx { color: var(--success); font-weight: 600; }
+.track-item.played .track-idx { color: var(--ok); font-weight: 600; }
 .track-item.played:hover { opacity: .85; }
 .track-item.now { border-color: var(--accent); background: rgba(0,229,255,.08); }
-.track-item.absent { color: var(--accent2); cursor: not-allowed; }
+.track-item.absent { color: var(--danger); cursor: not-allowed; }
 
 .empty-mini { color: var(--muted); font-size: .78rem; padding: .5rem 0; }
 
@@ -360,14 +378,19 @@ body.indices-hidden .btn-toggle-indices {
   padding: 1rem 1.75rem 1.25rem; display: flex; gap: .6rem;
   border-top: 1px solid var(--border); flex-shrink: 0;
 }
-.btn {
+/* Renomme depuis .btn : dans CETTE vue, .btn designait le bouton
+   SECONDAIRE et .btn.primary le principal — exactement l'inverse du
+   reste du projet. Deux boutons cote a cote portant le meme nom de
+   classe pour des roles opposes, c'est un piege garanti au premier
+   composant deplace. */
+.btn-modal {
   background: var(--surface2); border: 1px solid var(--border); color: var(--text);
   border-radius: 9px; font-family: 'Outfit', sans-serif; font-size: .88rem;
   padding: .75rem 1rem; cursor: pointer; flex: 1; text-align: center; transition: all .18s;
 }
-.btn:hover { border-color: var(--accent); }
-.btn.primary { background: var(--accent); color: #061119; border-color: transparent; font-weight: 600; }
-.btn.primary:hover { filter: brightness(1.1); }
+.btn-modal:hover { border-color: var(--accent); }
+.btn-modal.primary { background: var(--accent); color: #061119; border-color: transparent; font-weight: 600; }
+.btn-modal.primary:hover { filter: brightness(1.1); }
 
 /* ─── PANNEAU DE SCORING ─── */
 .scoring-panel { padding: 1.5rem 1.75rem .5rem; flex: 1; overflow-y: auto; min-height: 0; }
@@ -376,7 +399,7 @@ body.indices-hidden .btn-toggle-indices {
   font-size: .6rem; letter-spacing: .25em; text-transform: uppercase;
   color: var(--muted); margin-bottom: .5rem;
 }
-.sc-hint { font-size: .55rem; letter-spacing: .15em; color: var(--accent3); text-transform: none; font-style: italic; margin-left: .5rem; }
+.sc-hint { font-size: .55rem; letter-spacing: .15em; color: var(--warn); text-transform: none; font-style: italic; margin-left: .5rem; }
 .sc-votes { display: flex; flex-direction: column; gap: .3rem; }
 .sc-vote-row {
   display: flex; align-items: center; gap: .5rem; font-size: .78rem;
@@ -414,9 +437,9 @@ body.indices-hidden .btn-toggle-indices {
 .folder-text { color: var(--muted); font-size: .88rem; }
 .folder-report { width: 100%; }
 .banner { border-radius: var(--radius); padding: .7rem .9rem; font-size: .82rem; text-align: left; }
-.banner.good { background: rgba(6,214,160,.08); border: 1px solid #17553f; color: var(--success); }
-.banner.warn { background: rgba(255,209,102,.08); border: 1px solid #6b5a20; color: var(--accent3); }
-.banner.bad  { background: rgba(255,107,107,.08); border: 1px solid #5a2020; color: var(--accent2); }
+.banner.good { background: rgba(6,214,160,.08); border: 1px solid #17553f; color: var(--ok); }
+.banner.warn { background: rgba(255,209,102,.08); border: 1px solid #6b5a20; color: var(--warn); }
+.banner.bad  { background: rgba(255,107,107,.08); border: 1px solid #5a2020; color: var(--danger); }
 
 canvas#confetti-canvas { position: fixed; inset: 0; pointer-events: none; z-index: 3000; }
 
@@ -427,7 +450,7 @@ canvas#confetti-canvas { position: fixed; inset: 0; pointer-events: none; z-inde
   border-radius: 999px; padding: .55rem 1.1rem; font-size: .82rem; transition: all .2s;
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
-.toast.err { border-color: var(--accent2); color: var(--accent2); }
+.toast.err { border-color: var(--danger); color: var(--danger); }
 
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -497,7 +520,7 @@ canvas#confetti-canvas { position: fixed; inset: 0; pointer-events: none; z-inde
   border-radius: 8px; font-family: 'Outfit', sans-serif; font-size: .78rem;
   padding: .55rem 1rem; cursor: pointer; transition: all .18s;
 }
-.btn-reset-played:hover:not(:disabled) { border-color: var(--accent3); color: var(--accent3); }
+.btn-reset-played:hover:not(:disabled) { border-color: var(--warn); color: var(--warn); }
 .btn-reset-played:disabled { opacity: .3; cursor: not-allowed; }
 
 /* ─── Options de partie ─── */
@@ -514,6 +537,13 @@ canvas#confetti-canvas { position: fixed; inset: 0; pointer-events: none; z-inde
   font-size: .78rem; cursor: pointer; user-select: none;
 }
 .match-option input[type="checkbox"] { width: 14px; height: 14px; cursor: pointer; accent-color: var(--accent); }
+.match-range { gap: .6rem; }
+.match-range label { flex-shrink: 0; cursor: pointer; }
+.match-range input[type="range"] { flex: 1; min-width: 0; accent-color: var(--accent); cursor: pointer; }
+.match-range output {
+  flex-shrink: 0; min-width: 3.2ch; text-align: right;
+  font-family: 'Bebas Neue', sans-serif; letter-spacing: .06em; color: var(--accent);
+}
 .match-option em { font-style: italic; opacity: .7; }
 
 /* ─── Aide raccourcis ─── */
@@ -570,8 +600,8 @@ canvas#confetti-canvas { position: fixed; inset: 0; pointer-events: none; z-inde
 .live-kpi .lk-k {
   font-size: .55rem; letter-spacing: .22em; text-transform: uppercase; color: var(--muted);
 }
-.live-kpi.complete { border-color: var(--success); box-shadow: 0 0 18px rgba(6,214,160,.25); }
-.live-kpi.complete .lk-v { color: var(--success); }
+.live-kpi.complete { border-color: var(--ok); box-shadow: 0 0 18px rgba(6,214,160,.25); }
+.live-kpi.complete .lk-v { color: var(--ok); }
 .live-kpi.idle { opacity: .35; }
 
 /* ─── Jukebox : écoute libre hors manche ─── */

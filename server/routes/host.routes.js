@@ -105,14 +105,39 @@ router.get('/parties/:code', requirePartyOwner, wrap(async (req, res) => {
   res.json({ party: req.party, participants, progress, session });
 }));
 
-/** Options de partie, modifiables même en cours de soirée. */
+/**
+ * Options de partie, modifiables même en cours de soirée.
+ *
+ * Peut refuser : abaisser le quota maximum sous un panier déjà
+ * constitué placerait des participants hors des règles sans qu'aucun
+ * geste de leur part ne puisse corriger la situation.
+ */
 router.patch('/parties/:code/settings', requirePartyOwner, wrap(async (req, res) => {
-  const party = await partyRepo.updateSettings(req.party.id, req.body || {});
+  const result = await partyRepo.updateSettings(req.party.id, req.body || {});
+  if (!result.ok) return res.status(409).json(result);
+
+  const { party } = result;
   // Un salon déjà ouvert garde une copie des réglages : il faut la
   // rafraîchir, sinon le changement ne prend effet qu'à la prochaine
   // ouverture.
   Rooms.applySettings(party.code, party);
+  // …et prévenir les clients CONNECTÉS. Sans ces deux lignes, le salon
+  // applique bien la nouvelle règle mais le lecteur ouvert et les
+  // téléphones continuent d'afficher l'ancienne jusqu'au prochain
+  // rechargement : l'hôte coche une case et ne voit rien changer.
+  const room = Rooms.getRoom(party.code);
+  if (room) notify.settingsChanged(party.code, room.settings);
+  notify.partyChanged(party.code, party.state);
+
   res.json({ party });
+}));
+
+/**
+ * Plancher du quota maximum, pour que la console l'affiche SOUS le
+ * champ plutôt que de le faire découvrir au moment du refus.
+ */
+router.get('/parties/:code/quota-floor', requirePartyOwner, wrap(async (req, res) => {
+  res.json(await partyRepo.trackCeiling(req.party.id));
 }));
 
 router.patch('/parties/:code/state', requirePartyOwner, wrap(async (req, res) => {
@@ -236,7 +261,15 @@ router.get('/parties/:code/manifest', requirePartyOwner, wrap(async (req, res) =
   // outils de téléchargement en lot. Rien d'autre sur la ligne, sinon
   // ils refusent l'entrée.
   if (req.query.format === 'urls') {
-    const urls = rows.map(r => r.url).filter(Boolean);
+    // Groupées par source : on télécharge d'un service à la fois, et
+    // alterner Deezer / iTunes / MusicBrainz ligne après ligne oblige à
+    // changer d'outil à chaque morceau.
+    const urls = rows
+      .filter(r => r.url)
+      .slice()
+      .sort((a, b) => (a.source || '').localeCompare(b.source || '')
+                   || a.acquisition_no - b.acquisition_no)
+      .map(r => r.url);
     res.type('text/plain; charset=utf-8')
        .attachment(`urls-${req.party.code}.txt`)
        .send(urls.join('\n') + (urls.length ? '\n' : ''));

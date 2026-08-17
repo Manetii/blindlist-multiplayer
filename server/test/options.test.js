@@ -54,7 +54,7 @@ const ph=await (await fetch(B+'/h/'+code+'/play',{headers:C})).text();
 const pc=await (await fetch(B+'/play/styles.css')).text();
 const pj=await (await fetch(B+'/play/app.js')).text();
 for(const id of ['tab-players','tab-playlist','btn-mode-tv','btn-help','close-players','close-playlist',
-                 'tr-sort','tr-anon','btn-reset-played','opt-hide-indices','opt-rule-bluffer','opt-rule-trapper','help-overlay'])
+                 'tr-sort','tr-anon','btn-reset-played','help-overlay'])
   ok('id : '+id, ph.includes('id="'+id+'"'));
 for(const sel of ['body.panel-players-open .col-players','body.panel-playlist-open .col-playlist',
                   '.tab-btn.active','#btn-mode-tv.active','.track-player-badge.anon',

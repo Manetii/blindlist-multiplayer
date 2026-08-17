@@ -86,7 +86,7 @@ ok('defaut sur : aucun bouton', pj.includes("let button = '';"));
 ok('veille WebSocket', pj.includes('startWatching')&&pj.includes('PLAYER_WATCH'));
 ok('champ de creation de pseudo', ph.includes('id="claim-new-name"'));
 ok('bloc coller un lien', ph.includes('id="paste-url"'));
-ok('reglage auto-inscription cote hote', hh.includes('id="opt-self-reg"'));
+ok('plus de saisie de pseudos par l hote', !hh.includes('id="p-add"')&&!hh.includes('id="opt-self-reg"'));
 
 console.log(f?`\n${f} echec(s)`:'\nTous les tests passent.');
 server.close(); await db.close(); process.exit(f?1:0);

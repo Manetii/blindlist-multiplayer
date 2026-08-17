@@ -111,7 +111,7 @@ CREATE TABLE parties (
   -- false (défaut) : l'hôte crée la liste des participants, chacun
   --   revendique son nom via le lien partagé /j/<code>.
   -- true : n'importe qui ouvrant le lien peut créer son propre nom.
-  allow_self_registration  boolean  NOT NULL DEFAULT false,
+  allow_self_registration  boolean  NOT NULL DEFAULT true,
 
   rule_trapper_enabled     boolean  NOT NULL DEFAULT false,
 

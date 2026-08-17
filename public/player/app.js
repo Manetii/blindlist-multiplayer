@@ -190,7 +190,7 @@
     if (!data.participants.length) {
       list.innerHTML = canCreate
         ? '<p class="empty">Personne pour l\'instant — sois le premier.</p>'
-        : '<p class="empty">L\'hôte n\'a encore ajouté personne.<br>Reviens dans un moment.</p>';
+        : '<p class="empty">Les inscriptions sont closes pour cette soirée.</p>';
       return;
     }
 

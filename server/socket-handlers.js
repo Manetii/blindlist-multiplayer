@@ -338,6 +338,22 @@ function registerHandlers(io, socket) {
     // déjà coché au reveal suivant.
     evaluateAdvance(room);
 
+    // Plafond d'enlisement. L'entracte en avait un, la manche non : un
+    // joueur connecté qui pose son téléphone bloquait l'auto-reveal
+    // sans limite. On NE révèle PAS d'office — la réponse appartient à
+    // l'hôte — on lui signale simplement que l'attente n'aboutira pas.
+    Timers.set(room.code, 'stall', DELAYS.VOTE_STALL_MS, () => {
+      if (!room.round.active || room.round.revealed) return;
+      const t = Rooms.voteTally(room);
+      if (t.complete) return;
+      if (!room.hostSocketId) return;
+      io.to(room.hostSocketId).emit(EVENTS.STATE_VOTE_PROGRESS, {
+        voted: t.voted, connected: t.connected, pending: t.pending,
+        votes: Rooms.votesAsArray(room), stalled: true,
+      });
+      console.log(`[${room.code}] manche enlisée — ${t.pending.join(', ')} n'ont pas voté`);
+    });
+
     ack(cb, {
       ok: true,
       track,
@@ -358,6 +374,7 @@ function registerHandlers(io, socket) {
     if (!room.round.active) return ack(cb, { ok: false, error: 'Aucune manche en cours.' });
 
     Timers.clear(room.code, 'reveal');
+    Timers.clear(room.code, 'stall');
     clearCue(room);
 
     const votes = Rooms.revealAnswer(room, answer);

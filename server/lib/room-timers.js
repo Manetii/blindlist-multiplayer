@@ -40,6 +40,20 @@ const DELAYS = {
   ADVANCE_COUNTDOWN_MS: 3_000,
 
   /**
+   * Durée au-delà de laquelle une manche est considérée comme enlisée.
+   *
+   * L'entracte avait un plafond, la manche non : un joueur connecté qui
+   * pose son téléphone sans voter neutralisait l'auto-reveal
+   * indéfiniment. Rien ne cassait — l'hôte pouvait toujours révéler à la
+   * main — mais l'automatisme s'évaporait sans que rien ne le dise.
+   *
+   * On ne révèle PAS d'office : la réponse appartient à l'hôte, et
+   * couper une manche que la table écoute encore serait pire que
+   * l'attente. On se contente de le signaler.
+   */
+  VOTE_STALL_MS: 4 * 60_000,
+
+  /**
    * Durée maximale d'un entracte. Rend l'interblocage impossible par
    * construction : téléphone en veille, batterie morte, joueur parti
    * sans prévenir — au bout de 5 min on avance. Gelé par la pause.

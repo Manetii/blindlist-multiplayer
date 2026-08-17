@@ -23,7 +23,7 @@ const PUBLIC_COLUMNS = `
   auto_reveal_on_all_votes, auto_advance_on_all_ready,
   allow_self_registration,
   rule_bluffer_enabled, rule_trapper_enabled, hide_indices_default,
-  start_at_key_moment,
+  key_moment_pct,
   created_at, last_activity_at, locked_at, archived_at
 `;
 
@@ -50,7 +50,7 @@ async function create({ name, minTracks = 3, maxTracks = 6, settings = {} }) {
             min_tracks_per_person, max_tracks_per_person,
             auto_reveal_on_all_votes, auto_advance_on_all_ready,
             allow_self_registration, rule_bluffer_enabled,
-            rule_trapper_enabled, hide_indices_default, start_at_key_moment)
+            rule_trapper_enabled, hide_indices_default, key_moment_pct)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
          RETURNING ${PUBLIC_COLUMNS}`,
         [
@@ -61,11 +61,11 @@ async function create({ name, minTracks = 3, maxTracks = 6, settings = {} }) {
           maxTracks,
           settings.autoReveal  !== false,
           settings.autoAdvance !== false,
-          settings.selfRegistration === true,
+          settings.selfRegistration !== false,
           settings.blufferRule !== false,
           settings.trapperRule === true,
           settings.hideIndices !== false,
-          settings.startAtKeyMoment !== false,
+          clampInt(settings.keyMomentPct, 25, 0, 50),
         ]
       );
       return { party: row, hostToken };
@@ -280,35 +280,116 @@ async function setState(partyId, next) {
 }
 
 /**
- * Met à jour les options modifiables en cours de soirée.
+ * Options modifiables en cours de soirée.
  *
  * Liste blanche explicite : sans elle, une clé inattendue dans le corps
  * de la requête pourrait écrire n'importe quelle colonne.
+ *
+ * Chaque entrée porte désormais son TYPE. L'ancienne version filtrait
+ * sur `typeof !== 'boolean'` et rejetait donc en silence toute valeur
+ * numérique — un PATCH du quota repartait avec un 200 et une soirée
+ * inchangée.
  */
 const MUTABLE_SETTINGS = {
-  blufferRule: 'rule_bluffer_enabled',
-  trapperRule: 'rule_trapper_enabled',
-  hideIndices: 'hide_indices_default',
-  startAtKeyMoment: 'start_at_key_moment',
-  selfRegistration: 'allow_self_registration',
-  autoReveal:  'auto_reveal_on_all_votes',
-  autoAdvance: 'auto_advance_on_all_ready',
+  blufferRule:      { column: 'rule_bluffer_enabled',      type: 'bool' },
+  trapperRule:      { column: 'rule_trapper_enabled',      type: 'bool' },
+  hideIndices:      { column: 'hide_indices_default',      type: 'bool' },
+  selfRegistration: { column: 'allow_self_registration',   type: 'bool' },
+  autoReveal:       { column: 'auto_reveal_on_all_votes',  type: 'bool' },
+  autoAdvance:      { column: 'auto_advance_on_all_ready', type: 'bool' },
+  keyMomentPct:     { column: 'key_moment_pct',            type: 'int', min: 0, max: 50 },
+  minTracks:        { column: 'min_tracks_per_person',     type: 'int', min: 1, max: 50 },
+  maxTracks:        { column: 'max_tracks_per_person',     type: 'int', min: 1, max: 50 },
 };
 
+/** Entier borné, ou `fallback` si la valeur n'en est pas un. */
+function clampInt(value, fallback, min, max) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(n)));
+}
+
+/**
+ * Plancher du maximum : le plus gros panier déjà constitué.
+ *
+ * Abaisser le maximum sous cette valeur laisserait des participants
+ * au-dessus d'un quota qu'ils ne peuvent plus respecter — ils ne
+ * peuvent pas deviner qu'il faut retirer un morceau, et l'hôte ne
+ * saurait pas lesquels retirer à leur place.
+ *
+ * Renvoie aussi les noms concernés : un refus qui ne dit pas QUI fixe
+ * le plancher oblige l'hôte à chercher lui-même.
+ */
+async function trackCeiling(partyId) {
+  const rows = await db.many(
+    `SELECT pa.display_name, count(t.id)::int AS n
+       FROM participants pa
+       LEFT JOIN tracks t
+         ON t.participant_id = pa.id AND t.state <> 'excluded'
+      WHERE pa.party_id = $1
+      GROUP BY pa.id
+      ORDER BY n DESC`,
+    [partyId]
+  );
+  const ceiling = rows.length ? rows[0].n : 0;
+  return {
+    ceiling,
+    holders: rows.filter(r => r.n === ceiling && ceiling > 0).map(r => r.display_name),
+  };
+}
+
 async function updateSettings(partyId, settings = {}) {
+  // Le maximum est le seul réglage qui puisse invalider des données
+  // déjà saisies. On le vérifie AVANT d'écrire quoi que ce soit :
+  // écrire les autres options puis refuser laisserait la soirée dans
+  // un état que l'hôte n'a pas demandé.
+  if (settings.maxTracks !== undefined) {
+    const wanted = Number(settings.maxTracks);
+    const { ceiling, holders } = await trackCeiling(partyId);
+    if (Number.isFinite(wanted) && wanted < ceiling) {
+      return {
+        ok: false,
+        conflict: 'max_below_existing',
+        floor: ceiling,
+        holders,
+        error: `Impossible de descendre sous ${ceiling} : ` +
+               `${holders.join(', ')} ${holders.length > 1 ? 'ont' : 'a'} ` +
+               `déjà ${ceiling} morceaux.`,
+      };
+    }
+  }
+
   const sets = [];
   const values = [partyId];
-  for (const [key, column] of Object.entries(MUTABLE_SETTINGS)) {
-    if (typeof settings[key] !== 'boolean') continue;
-    values.push(settings[key]);
-    sets.push(`${column} = $${values.length}`);
+
+  for (const [key, spec] of Object.entries(MUTABLE_SETTINGS)) {
+    const raw = settings[key];
+    if (raw === undefined) continue;
+
+    let value;
+    if (spec.type === 'bool') {
+      // Un réglage booléen ne s'écrit que sur un vrai booléen : accepter
+      // 'false' ou 0 ouvrirait la porte aux surprises de coercition.
+      if (typeof raw !== 'boolean') continue;
+      value = raw;
+    } else {
+      const n = Number(raw);
+      if (!Number.isFinite(n)) continue;
+      value = clampInt(n, null, spec.min, spec.max);
+    }
+
+    values.push(value);
+    sets.push(`${spec.column} = $${values.length}`);
   }
-  if (!sets.length) return findById(partyId);
-  return db.one(
+
+  if (!sets.length) return { ok: true, party: await findById(partyId) };
+
+  const party = await db.one(
     `UPDATE parties SET ${sets.join(', ')}, last_activity_at = now()
       WHERE id = $1 RETURNING ${PUBLIC_COLUMNS}`,
     values
   );
+  return { ok: true, party };
 }
 
 // ─── Administration ─────────────────────────────────────────────
@@ -343,6 +424,6 @@ async function archiveStale({ days = 90 } = {}) {
 
 module.exports = {
   create, findByCode, findById, authenticateHost, progress, touch,
-  lock, unlock, setState, canTransition, updateSettings,
+  lock, unlock, setState, canTransition, updateSettings, trackCeiling,
   listAll, archiveStale,
 };

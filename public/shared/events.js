@@ -64,6 +64,10 @@ const EVENTS = {
   STATE_ROOM_CLOSED:   'state:room-closed',
   STATE_GAME_OVER:     'state:game-over',     // playlist épuisée → podium
   STATE_PARTY_CHANGED: 'state:party-changed', // l'état de la soirée a bougé
+  // Les règles se décident dans la console, pas sur l'écran de jeu. Sans
+  // cet événement, le salon appliquait bien la nouvelle règle mais le
+  // lecteur ouvert continuait d'afficher l'ancienne.
+  STATE_SETTINGS:      'state:settings',      // {settings}
 
   // ─── SERVEUR → HOST : signal d'automatisme ───
   HOST_CUE:            'host:cue',            // {action:'reveal'|'advance', reason}

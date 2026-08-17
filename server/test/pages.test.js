@@ -31,7 +31,7 @@ const log=await fetch(B+'/login',{method:'POST',headers:{'Content-Type':'applica
 const ck=(log.headers.get('set-cookie')||'').split(';')[0];
 const hc=await fetch(B+'/h',{headers:{Cookie:ck}}); const hct=await hc.text();
 ok('console servie apres login', hc.status===200 && hct.includes('Nouvelle soirée'));
-ok('console porte les sections H2-H6', ['s-people','s-progress','s-dupes','s-lock','s-files'].every(id=>hct.includes(id)));
+ok('console porte les trois sections', ['s-people','s-dupes','s-collect','s-files','s-options','s-play'].every(id=>hct.includes(id)));
 const hcode=await fetch(B+'/h/ABCD',{headers:{Cookie:ck}});
 ok('console par code servie', hcode.status===200);
 

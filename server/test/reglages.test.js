@@ -22,7 +22,7 @@ const cr=await J('POST','/api/host/parties',{headers:C,body:{name:'N',minTracks:
 const code=cr.data.party.code, HT={...C,'X-Host-Token':cr.data.hostToken};
 
 // ═══ Option de point de depart ═══
-ok('saut d intro actif par defaut', cr.data.party.start_at_key_moment===true);
+ok('saut d intro a 25% par defaut', cr.data.party.key_moment_pct===25);
 const ids={}; for(const n of ['Alice','Bob'])
   ids[n]=(await J('POST',`/api/host/parties/${code}/participants`,{headers:HT,body:{displayName:n}})).data.participant.id;
 const lst=await J('GET',`/api/join/${code}`); const tk={};
@@ -59,7 +59,7 @@ const H=cli(B); await p(H,E.HOST_OPEN_ROOM,{code,hostToken:cr.data.hostToken});
 const r1=await p(H,E.HOST_START_ROUND,{trackId:cp.id});
 ok('demarre au moment cle', r1.startOffsetMs===50000, `${r1.startOffsetMs} ms`);
 await p(H,E.HOST_NEXT_ROUND,{});
-await J('PATCH',`/api/host/parties/${code}/settings`,{headers:HT,body:{startAtKeyMoment:false}});
+await J('PATCH',`/api/host/parties/${code}/settings`,{headers:HT,body:{keyMomentPct:0}});
 const H2=cli(B); await p(H2,E.HOST_OPEN_ROOM,{code,hostToken:cr.data.hostToken});
 const r2=await p(H2,E.HOST_START_ROUND,{trackId:pl2.id});
 ok('OPTION : demarre au debut', r2.startOffsetMs===0, `${r2.startOffsetMs} ms`);
@@ -72,7 +72,10 @@ ok('les deux decomptes animes', gj.includes("countdown('#countdown'")&&gj.includ
 const yj=await (await fetch(B+'/play/app.js')).text();
 ok('hote voit le decompte', yj.includes('Lancement dans'));
 const pyh=await (await fetch(B+'/h/'+code+'/play',{headers:C})).text();
-ok('option point de depart dans l interface', pyh.includes('id="opt-key-moment"'));
+const hcons=await (await fetch(B+'/h/'+code,{headers:C})).text();
+ok('curseur de point de depart dans la console', hcons.includes('id="opt-key-moment"')&&hcons.includes('type="range"'));
+ok('regles de jeu dans la console', hcons.includes('id="opt-rule-bluffer"')&&hcons.includes('id="opt-rule-trapper"'));
+ok('lecteur debarrasse des reglages', !pyh.includes('id="opt-rule-bluffer"'));
 const mj=await (await fetch(B+'/shared/matching.js')).text();
 ok('extraction de pochette APIC', mj.includes("id === 'APIC'")&&mj.includes('pictureToDataUrl'));
 

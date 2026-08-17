@@ -279,9 +279,15 @@
       // Les votes restent en mémoire pour le calcul des points, mais ne
       // sont plus affichés : seul le compte l'est.
       S.votes = t.votes || [];
-      setKpi('#kpi-votes', t.voted, t.connected, !!S.round);
+      setWaitKpi(t.voted, t.connected, 'vote');
       if (S.round && !S.round.revealed) {
         renderWaitingFor({ done: t.voted, connected: t.connected, pending: t.pending }, 'vote');
+        // Manche enlisée : l'attente n'aboutira pas toute seule. On le
+        // dit sans rien décider à la place de l'hôte.
+        if (t.stalled) {
+          status(`${(t.pending || []).join(', ')} n'${(t.pending || []).length > 1 ? 'ont' : 'a'} `
+               + 'toujours pas voté — révèle quand tu veux (R).', 'error');
+        }
       }
     });
 
@@ -292,7 +298,7 @@
     });
 
     S.socket.on(EVENTS.STATE_READY_PROGRESS, (t) => {
-      setKpi('#kpi-ready', t.ready, t.connected, true);
+      setWaitKpi(t.ready, t.connected, 'ready');
       // Pendant une manche non révélée, c'est l'attente des votes qui
       // compte : ne pas écraser ce message.
       if (!S.round || S.round.revealed) {
@@ -322,6 +328,15 @@
         renderScores();
         toast('Vote(s) de dernière seconde pris en compte.');
       }
+    });
+
+    // Les règles se changent depuis la console pendant que le lecteur
+    // est ouvert : sans cette écoute, il continuerait de calculer les
+    // points avec l'ancienne jusqu'au prochain rechargement.
+    S.socket.on(EVENTS.STATE_SETTINGS, ({ settings }) => {
+      S.settings = settings || S.settings;
+      renderOptions();
+      toast('Règles mises à jour depuis la console.');
     });
 
     S.socket.on(EVENTS.STATE_GAME_OVER, ({ standings }) => renderPodium(standings));
@@ -355,8 +370,7 @@
                   startOffsetMs: res.startOffsetMs };
       S.votes = [];
       S.adjustments.clear();
-      setKpi('#kpi-votes', 0, S.players.filter(p => p.connected).length, true);
-      setKpi('#kpi-ready', 0, S.players.filter(p => p.connected).length, false);
+      setWaitKpi(0, S.players.filter(p => p.connected).length, 'vote');
 
       try {
         await AudioEngine.play(chosen.file_name, res.startOffsetMs);
@@ -527,6 +541,11 @@
       $('#np-artist').textContent = `${t.artist} · proposé par ${t.proposed_by}`;
       $('#np-status').style.opacity = '1';
       $('#vinyl').classList.add('spinning');
+      // La pochette aussi : hors jeu il n'y a rien a cacher, et c'est
+      // precisement ce qu'on regarde pour verifier qu'un fichier est
+      // le bon. Sans elle, le vinyle restait nu en ecoute libre alors
+      // qu'il s'illustre en manche.
+      setVinylArt(t.artwork_url);
       status('Écoute libre — aucune manche en cours');
     } catch (err) {
       toast(err.message, true);
@@ -578,31 +597,44 @@
   //  5. Rendu
   // ═══════════════════════════════════════════════════════════
 
-  /** Reflète les réglages de la soirée dans les cases à cocher. */
+  /**
+   * Applique les réglages venus de la console.
+   *
+   * Ils ne se MODIFIENT plus ici : un écran que la salle regarde n'est
+   * pas l'endroit où l'on règle une partie. Seule reste la mise en
+   * scène — le bouton œil et l'anonymisation.
+   */
   function renderOptions() {
     const s = S.settings || {};
-    const set = (id, v) => { const el = $(id); if (el) el.checked = v !== false; };
-    set('#opt-hide-indices', s.hideIndices);
-    set('#opt-key-moment', s.startAtKeyMoment);
-    set('#opt-rule-bluffer', s.blufferRule);
-    $('#opt-rule-trapper').checked = s.trapperRule === true;
+    // Hors manche, rien à masquer : le flou se pose au lancement.
+    if (S.round) {
+      document.body.classList.toggle('indices-hidden', s.hideIndices !== false);
+    }
   }
 
-  async function saveOption(key, value) {
-    S.settings[key] = value;
-    const { ok } = await api('PATCH', `/api/host/parties/${S.code}/settings`, { [key]: value });
-    toast(ok ? 'Option enregistrée.' : 'Enregistrement impossible.', !ok);
-  }
 
   function renderAll() {
     renderNowPlaying();
     renderPlayers();
     renderTracks();
-    $('#game-counter').textContent = `${played.size} / ${S.tracks.length} JOUÉS`;
+    $('#game-counter').textContent = `${played.size}/${S.tracks.length}`;
     // Un seul bouton d'action à la fois — comme en v1 : soit on lance,
     // soit on révèle, jamais les deux.
     $('#btn-launch').classList.toggle('hidden', !!S.round);
     $('#btn-reveal').classList.toggle('hidden', !S.round);
+    // « Lancer le morceau suivant » n'a pas de sens quand il n'y a pas
+    // eu de precedent : le premier geste de la soiree merite d'etre
+    // nomme pour ce qu'il est.
+    $('#btn-launch').textContent = played.size === 0
+      ? '▶ Démarrer la partie'
+      : '▶ Lancer le morceau suivant';
+    // Hors manche, l'avance rapide n'a rien a piloter : la garder
+    // affichee suggere une commande qui ne fait rien. La lecture, la
+    // pause et le clic sur la barre restent disponibles — verifier un
+    // fichier en ecoute libre demande parfois d'y avancer.
+    for (const id of ['#btn-back10', '#btn-fwd10', '#btn-fwd30']) {
+      $(id).classList.toggle('hidden', !S.round);
+    }
     document.body.classList.toggle('round-active', !!S.round);
   }
 
@@ -627,6 +659,37 @@
     el.classList.toggle('idle', !active);
   }
 
+  /**
+   * Compteur d'attente unique.
+   *
+   * Le serveur ne peut pas attendre des votes ET des « prêts » en même
+   * temps : evaluateReveal et evaluateAdvance s'excluent. Le libellé
+   * bascule donc au lieu d'occuper deux cases.
+   *
+   * ATTENTION à la bascule : les joueurs peuvent se déclarer prêts DÈS
+   * l'écran de révélation. Une manche révélée attend donc des « prêts »,
+   * pas des votes.
+   */
+  function waitKind() {
+    return (S.round && !S.round.revealed) ? 'vote' : 'ready';
+  }
+
+  function setWaitKpi(value, total, kind) {
+    if (kind !== waitKind()) return;      // phase dépassée, on ignore
+    $('#kpi-wait-label').textContent = kind === 'vote' ? 'votes' : 'prêts';
+    setKpi('#kpi-wait', value, total, true);
+  }
+
+  /** Pochette sur le vinyle, ou pastille centrale a defaut. */
+  function setVinylArt(url) {
+    const art = $('#vinyl-art'), dot = $('#vinyl-dot');
+    if (url) {
+      art.src = url; art.style.display = 'block'; dot.style.display = 'none';
+    } else {
+      art.style.display = 'none'; dot.style.display = 'block';
+    }
+  }
+
   function renderNowPlaying() {
     const vinyl = $('#vinyl'), art = $('#vinyl-art'), dot = $('#vinyl-dot');
 
@@ -646,11 +709,7 @@
     $('#np-status').style.opacity = '1';
     vinyl.classList.add('spinning');
 
-    if (t.artwork_url) {
-      art.src = t.artwork_url; art.style.display = 'block'; dot.style.display = 'none';
-    } else {
-      art.style.display = 'none'; dot.style.display = 'block';
-    }
+    setVinylArt(t.artwork_url);
     // Chaque manche repart indices masqués — sauf si l'hôte a désactivé
     // l'option.
     document.body.classList.toggle('indices-hidden', S.settings.hideIndices !== false);
@@ -860,12 +919,6 @@
     });
     $('#btn-reset-played').addEventListener('click', resetPlayed);
 
-    // Options de partie
-    $('#opt-hide-indices').addEventListener('change', (e) => saveOption('hideIndices', e.target.checked));
-    $('#opt-key-moment').addEventListener('change', (e) => saveOption('startAtKeyMoment', e.target.checked));
-    $('#opt-rule-bluffer').addEventListener('change', (e) => saveOption('blufferRule', e.target.checked));
-    $('#opt-rule-trapper').addEventListener('change', (e) => saveOption('trapperRule', e.target.checked));
-
     // Aide
     $('#btn-help').addEventListener('click', () => $('#help-overlay').classList.add('open'));
     $('#help-overlay').addEventListener('click', () => $('#help-overlay').classList.remove('open'));
@@ -944,6 +997,10 @@
     const m = location.pathname.match(/^\/h\/([A-Za-z0-9]+)\/play/);
     if (!m) { location.href = '/h'; return; }
     S.code = m[1].toUpperCase();
+
+    // Le lien de retour etait fige sur /h — l'ecran de creation. On
+    // revient a la console de CETTE soiree, sur l'etape de lancement.
+    $('#back-console').href = `/h/${S.code}?step=2`;
 
     let parties = {};
     try { parties = JSON.parse(localStorage.getItem('blindtest:parties') || '{}'); } catch { /* ignore */ }

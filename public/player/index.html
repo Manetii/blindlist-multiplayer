@@ -1,221 +1,311 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="robots" content="noindex, nofollow">
-<meta name="theme-color" content="#080b10">
-<title>Blind Test — Ma sélection</title>
-<link rel="stylesheet" href="/player/styles.css">
-</head>
-<body>
-
-<!-- ═══ HEADER permanent (pseudo + score) — repris de la v1 ═══ -->
-<header class="player-header" id="player-header">
-  <div class="header-id">
-    <span class="header-dot" id="header-dot"></span>
-    <span class="header-name" id="header-name">—</span>
-  </div>
-  <div class="header-score-wrap">
-    <span class="header-score-label">Score</span>
-    <span class="header-score" id="header-score">0</span>
-  </div>
-</header>
-
-
-<!-- ═══ V2 — Saisie du code ═══════════════════════════════════ -->
-<section class="screen centered" data-screen="code">
-  <div class="mark"><span></span><span></span><span></span></div>
-  <h1 class="title">Blind<span>Test</span></h1>
-  <p class="tagline">Saisis le code que l'hôte t'a communiqué.</p>
-  <input id="code-input" class="field code-field" style="margin:1.25rem 0"
-         inputmode="latin" autocapitalize="characters" autocomplete="off"
-         autocorrect="off" spellcheck="false" maxlength="6"
-         placeholder="ABCD" aria-label="Code de la soirée">
-  <button id="code-btn" class="btn full">Continuer</button>
-  <p id="code-error" class="error" role="alert"></p>
-</section>
-
-<!-- ═══ V3 — Choisir son nom ══════════════════════════════════ -->
-<section class="screen" data-screen="claim">
-  <div class="mark"><span></span><span></span><span></span></div>
-  <h1 class="title" id="claim-party">Soirée</h1>
-  <p class="tagline">Touche ton nom dans la liste.</p>
-  <div id="claim-list" class="name-grid"></div>
-
-  <div id="claim-create" class="hidden" style="width:100%;max-width:340px;margin-top:1rem">
-    <div class="sep-or"><span>ou</span></div>
-    <input class="field" id="claim-new-name" maxlength="24" autocomplete="off"
-           placeholder="Ton prénom" aria-label="Créer ton nom">
-    <button class="btn full" id="claim-new-btn" style="margin-top:.5rem">Créer mon nom</button>
-  </div>
-
-  <p id="claim-error" class="error" role="alert"></p>
-  <button class="btn ghost full" style="margin-top:1rem" data-action="back-to-code">
-    Ce n'est pas la bonne soirée
-  </button>
-</section>
-
-<!-- ═══ P1 — Collecte : recherche + panier ════════════════════ -->
-<section class="screen" data-screen="collect">
-  <div class="collect-head">
-    <div>
-      <div class="party-name" id="collect-party">Soirée</div>
-      <div class="who">Tu proposes en tant que <b id="collect-me">…</b></div>
-    </div>
-  </div>
-
-  <div class="collect-body">
-    <div>
-      <div class="search-row">
-        <input id="search-input" class="field" type="search"
-               placeholder="Un titre, un artiste…" aria-label="Rechercher un morceau">
-        <button id="search-btn" class="btn">Chercher</button>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#080b10" />
+    <title>Blind Test — Ma sélection</title>
+    <link rel="stylesheet" href="/player/styles.css" />
+  </head>
+  <body>
+    <!-- ═══ HEADER permanent (pseudo + score) — repris de la v1 ═══ -->
+    <header class="player-header" id="player-header">
+      <div class="header-id">
+        <span class="header-dot" id="header-dot"></span>
+        <span class="header-name" id="header-name">—</span>
       </div>
-      <details class="paste-box">
-        <summary>La recherche ne trouve pas ton morceau ?</summary>
-        <p class="muted small" style="margin:.5rem 0">
-          Colle le lien du morceau depuis Spotify, YouTube, Deezer ou Apple Music,
-          puis complète le titre et l'artiste.
-        </p>
-        <input class="field" id="paste-url" placeholder="https://open.spotify.com/track/…" autocomplete="off">
-        <div class="paste-fields hidden" id="paste-fields">
-          <input class="field" id="paste-title"  placeholder="Titre" maxlength="200">
-          <input class="field" id="paste-artist" placeholder="Artiste" maxlength="200">
+      <div class="header-score-wrap">
+        <span class="header-score-label">Score</span>
+        <span class="header-score" id="header-score">0</span>
+      </div>
+    </header>
+
+    <!-- ═══ V2 — Saisie du code ═══════════════════════════════════ -->
+    <section class="screen centered" data-screen="code">
+      <div class="mark"><span></span><span></span><span></span></div>
+      <h1 class="title">Blind<span>List</span></h1>
+      <p class="tagline">Saisis le code que l'hôte t'a communiqué.</p>
+      <input
+        id="code-input"
+        class="field code-field"
+        style="margin: 1.25rem 0"
+        inputmode="latin"
+        autocapitalize="characters"
+        autocomplete="off"
+        autocorrect="off"
+        spellcheck="false"
+        maxlength="6"
+        placeholder="ABCD"
+        aria-label="Code de la soirée"
+      />
+      <button id="code-btn" class="btn full">Continuer</button>
+      <p id="code-error" class="error" role="alert"></p>
+    </section>
+
+    <!-- ═══ V3 — Choisir son nom ══════════════════════════════════ -->
+    <section class="screen" data-screen="claim">
+      <div class="mark"><span></span><span></span><span></span></div>
+      <h1 class="title" id="claim-party">Soirée</h1>
+      <p class="tagline">Touche ton nom dans la liste.</p>
+      <div id="claim-list" class="name-grid"></div>
+
+      <div
+        id="claim-create"
+        class="hidden"
+        style="width: 100%; max-width: 340px; margin-top: 1rem"
+      >
+        <div class="sep-or"><span>ou</span></div>
+        <input
+          class="field"
+          id="claim-new-name"
+          maxlength="24"
+          autocomplete="off"
+          placeholder="Ton prénom"
+          aria-label="Créer ton nom"
+        />
+        <button class="btn full" id="claim-new-btn" style="margin-top: 0.5rem">
+          Créer mon nom
+        </button>
+      </div>
+
+      <p id="claim-error" class="error" role="alert"></p>
+      <button
+        class="btn ghost full"
+        style="margin-top: 1rem"
+        data-action="back-to-code"
+      >
+        Ce n'est pas la bonne soirée
+      </button>
+    </section>
+
+    <!-- ═══ P1 — Collecte : recherche + panier ════════════════════ -->
+    <section class="screen" data-screen="collect">
+      <div class="collect-head">
+        <div>
+          <div class="party-name" id="collect-party">Soirée</div>
+          <div class="who">
+            Tu proposes en tant que <b id="collect-me">…</b>
+          </div>
         </div>
-        <button class="btn full" id="paste-btn" style="margin-top:.5rem">Vérifier le lien</button>
-        <p class="error" id="paste-error"></p>
-      </details>
-
-      <div class="source-filters" id="source-filters"></div>
-      <div id="results" class="results">
-        <p class="empty">Cherche un morceau pour commencer.<br>
-          Les autres ne verront ta sélection qu'au moment de jouer.</p>
       </div>
-    </div>
 
-    <div class="sheet-backdrop" id="sheet-backdrop"></div>
-    <div class="sheet" id="sheet">
-      <div class="sheet-grip"></div>
-      <h2>Ma sélection</h2>
-      <div id="basket"></div>
-      <div id="submit-zone" style="margin-top:1rem"></div>
-    </div>
-  </div>
+      <div class="collect-body">
+        <div>
+          <div class="search-row">
+            <input
+              id="search-input"
+              class="field"
+              type="search"
+              placeholder="Un titre, un artiste…"
+              aria-label="Rechercher un morceau"
+            />
+            <button id="search-btn" class="btn">Chercher</button>
+          </div>
+          <details class="paste-box">
+            <summary>La recherche ne trouve pas ton morceau ?</summary>
+            <p class="muted small" style="margin: 0.5rem 0">
+              Colle le lien du morceau depuis Spotify, YouTube, Deezer ou Apple
+              Music, puis complète le titre et l'artiste.
+            </p>
+            <input
+              class="field"
+              id="paste-url"
+              placeholder="https://open.spotify.com/track/…"
+              autocomplete="off"
+            />
+            <div class="paste-fields hidden" id="paste-fields">
+              <input
+                class="field"
+                id="paste-title"
+                placeholder="Titre"
+                maxlength="200"
+              />
+              <input
+                class="field"
+                id="paste-artist"
+                placeholder="Artiste"
+                maxlength="200"
+              />
+            </div>
+            <button class="btn full" id="paste-btn" style="margin-top: 0.5rem">
+              Vérifier le lien
+            </button>
+            <p class="error" id="paste-error"></p>
+          </details>
 
-  <div class="quota-bar" id="quota-bar" role="button" tabindex="0"
-       aria-label="Voir ma sélection">
-    <div class="segments" id="segments"></div>
-    <div class="quota-text">
-      <div class="quota-count" id="quota-count">0 / 6</div>
-      <div class="quota-hint" id="quota-hint">Encore 3 pour atteindre le minimum</div>
-    </div>
-    <div class="quota-chevron">▲</div>
-  </div>
-</section>
+          <div class="source-filters" id="source-filters"></div>
+          <div id="results" class="results">
+            <p class="empty">
+              Cherche un morceau pour commencer.<br />
+              Les autres ne verront ta sélection qu'au moment de jouer.
+            </p>
+          </div>
+        </div>
 
-<!-- ═══ P2 — Attente ══════════════════════════════════════════ -->
-<section class="screen centered" data-screen="wait">
-  <div class="mark"><span></span><span></span><span></span></div>
-  <h1 class="title" id="wait-party">Soirée</h1>
-  <p class="who" id="wait-me" style="margin-top:.3rem"></p>
-  <p class="tagline" id="wait-text">Les envois sont clos. Rendez-vous le jour J.</p>
-  <div id="wait-basket" class="name-grid" style="max-width:420px"></div>
-  <button class="btn ghost" data-action="switch" style="margin-top:1.5rem;max-width:320px">Rejoindre une autre soirée</button>
-</section>
-
-<!-- ═══ P3 — WAITING / entracte (balisage v1) ═══════════════ -->
-<section class="screen" data-screen="waiting">
-  <div class="waiting-vinyl">
-    <div class="waiting-vinyl-inner"></div>
-    <div class="waiting-vinyl-dot"></div>
-  </div>
-  <h2 class="waiting-title" id="waiting-title">En attente</h2>
-  <p class="waiting-sub" id="waiting-sub">Le Host va lancer le prochain morceau…</p>
-  <div class="waiting-pulse"><span></span><span></span><span></span></div>
-
-  <!-- Ajout v2 : le téléphone donne le rythme -->
-  <button class="vote-validate-btn" id="ready-btn" style="max-width:320px;margin-top:1.8rem">
-    Je suis prêt
-  </button>
-  <p class="waiting-sub" id="ready-count" style="margin-top:.7rem"></p>
-  <div class="waiting-countdown hidden" id="countdown"><span id="cd-num">3</span></div>
-</section>
-
-<!-- ═══ P4 — VOTE (balisage v1) ══════════════════════════════ -->
-<section class="screen" data-screen="vote">
-  <div class="vote-header">
-    <p class="vote-prompt-label">DEVINE</p>
-    <h2 class="vote-prompt">Qui a choisi ce morceau ?</h2>
-  </div>
-  <div class="vote-grid" id="vote-grid"></div>
-  <div class="vote-status" id="vote-status"></div>
-  <button class="vote-validate-btn" id="vote-validate-btn" disabled>
-    Choisis un joueur
-  </button>
-</section>
-
-<!-- ═══ P5 — REVEAL (balisage v1) ════════════════════════════ -->
-<section class="screen" data-screen="reveal">
-  <div class="reveal-card">
-    <div class="reveal-art-zone">
-      <div class="reveal-art-placeholder" id="reveal-art-placeholder">🎵</div>
-      <img class="reveal-art-img" id="reveal-art" alt="" />
-    </div>
-    <div class="reveal-info">
-      <p class="reveal-label">Le morceau était</p>
-      <h2 class="reveal-title" id="reveal-title">—</h2>
-      <p class="reveal-artist" id="reveal-artist">—</p>
-      <div class="reveal-divider"></div>
-      <p class="reveal-label">Choisi par</p>
-      <div class="reveal-player-row">
-        <span class="reveal-player-dot" id="reveal-player-dot"></span>
-        <span class="reveal-player-name" id="reveal-player">—</span>
+        <div class="sheet-backdrop" id="sheet-backdrop"></div>
+        <div class="sheet" id="sheet">
+          <div class="sheet-grip"></div>
+          <h2>Ma sélection</h2>
+          <div id="basket"></div>
+          <div id="submit-zone" style="margin-top: 1rem"></div>
+        </div>
       </div>
-    </div>
-    <div class="reveal-verdict" id="reveal-verdict"></div>
-  </div>
-  <p class="reveal-next" id="reveal-next">En attente de la prochaine manche…</p>
-  <!-- Se déclarer prêt sans attendre que l'hôte ait validé les points :
+
+      <div
+        class="quota-bar"
+        id="quota-bar"
+        role="button"
+        tabindex="0"
+        aria-label="Voir ma sélection"
+      >
+        <div class="segments" id="segments"></div>
+        <div class="quota-text">
+          <div class="quota-count" id="quota-count">0 / 6</div>
+          <div class="quota-hint" id="quota-hint">
+            Encore 3 pour atteindre le minimum
+          </div>
+        </div>
+        <div class="quota-chevron">▲</div>
+      </div>
+    </section>
+
+    <!-- ═══ P2 — Attente ══════════════════════════════════════════ -->
+    <section class="screen centered" data-screen="wait">
+      <div class="mark"><span></span><span></span><span></span></div>
+      <h1 class="title" id="wait-party">Soirée</h1>
+      <p class="who" id="wait-me" style="margin-top: 0.3rem"></p>
+      <p class="tagline" id="wait-text">
+        Les envois sont clos. Rendez-vous le jour J.
+      </p>
+      <div id="wait-basket" class="name-grid" style="max-width: 420px"></div>
+      <button
+        class="btn ghost"
+        data-action="switch"
+        style="margin-top: 1.5rem; max-width: 320px"
+      >
+        Rejoindre une autre soirée
+      </button>
+    </section>
+
+    <!-- ═══ P3 — WAITING / entracte (balisage v1) ═══════════════ -->
+    <section class="screen" data-screen="waiting">
+      <div class="waiting-vinyl">
+        <div class="waiting-vinyl-inner"></div>
+        <div class="waiting-vinyl-dot"></div>
+      </div>
+      <h2 class="waiting-title" id="waiting-title">En attente</h2>
+      <p class="waiting-sub" id="waiting-sub">
+        Le Host va lancer le prochain morceau…
+      </p>
+      <div class="waiting-pulse"><span></span><span></span><span></span></div>
+
+      <!-- Ajout v2 : le téléphone donne le rythme -->
+      <button
+        class="vote-validate-btn"
+        id="ready-btn"
+        style="max-width: 320px; margin-top: 1.8rem"
+      >
+        Je suis prêt
+      </button>
+      <p class="waiting-sub" id="ready-count" style="margin-top: 0.7rem"></p>
+      <div class="waiting-countdown hidden" id="countdown">
+        <span id="cd-num">3</span>
+      </div>
+    </section>
+
+    <!-- ═══ P4 — VOTE (balisage v1) ══════════════════════════════ -->
+    <section class="screen" data-screen="vote">
+      <div class="vote-header">
+        <p class="vote-prompt-label">DEVINE</p>
+        <h2 class="vote-prompt">Qui a choisi ce morceau ?</h2>
+      </div>
+      <div class="vote-grid" id="vote-grid"></div>
+      <div class="vote-status" id="vote-status"></div>
+      <button class="vote-validate-btn" id="vote-validate-btn" disabled>
+        Choisis un joueur
+      </button>
+    </section>
+
+    <!-- ═══ P5 — REVEAL (balisage v1) ════════════════════════════ -->
+    <section class="screen" data-screen="reveal">
+      <div class="reveal-card">
+        <div class="reveal-art-zone">
+          <div class="reveal-art-placeholder" id="reveal-art-placeholder">
+            🎵
+          </div>
+          <img class="reveal-art-img" id="reveal-art" alt="" />
+        </div>
+        <div class="reveal-info">
+          <p class="reveal-label">Le morceau était</p>
+          <h2 class="reveal-title" id="reveal-title">—</h2>
+          <p class="reveal-artist" id="reveal-artist">—</p>
+          <div class="reveal-divider"></div>
+          <p class="reveal-label">Choisi par</p>
+          <div class="reveal-player-row">
+            <span class="reveal-player-dot" id="reveal-player-dot"></span>
+            <span class="reveal-player-name" id="reveal-player">—</span>
+          </div>
+        </div>
+        <div class="reveal-verdict" id="reveal-verdict"></div>
+      </div>
+      <p class="reveal-next" id="reveal-next">
+        En attente de la prochaine manche…
+      </p>
+      <!-- Se déclarer prêt sans attendre que l'hôte ait validé les points :
        c'est ce qui évite le temps mort entre la révélation et la suite. -->
-  <button class="vote-validate-btn" id="reveal-ready-btn" style="max-width:340px;margin-top:1rem">
-    Je suis prêt pour la suite
-  </button>
-  <p class="waiting-sub" id="reveal-ready-count" style="margin-top:.6rem"></p>
-  <!-- Le même décompte que sur l'écran d'attente. Sans lui, les trois
+      <button
+        class="vote-validate-btn"
+        id="reveal-ready-btn"
+        style="max-width: 340px; margin-top: 1rem"
+      >
+        Je suis prêt pour la suite
+      </button>
+      <p
+        class="waiting-sub"
+        id="reveal-ready-count"
+        style="margin-top: 0.6rem"
+      ></p>
+      <!-- Le même décompte que sur l'écran d'attente. Sans lui, les trois
        secondes qui précèdent le lancement passent pour un plantage. -->
-  <div class="waiting-countdown hidden" id="reveal-countdown"><span id="reveal-cd-num">3</span></div>
-</section>
+      <div class="waiting-countdown hidden" id="reveal-countdown">
+        <span id="reveal-cd-num">3</span>
+      </div>
+    </section>
 
-<!-- ═══ P6 — Podium ══════════════════════════════════════════ -->
-<section class="screen centered" data-screen="podium">
-  <div class="mark"><span></span><span></span><span></span></div>
-  <h1 class="title">Fin de partie</h1>
-  <div id="podium-list" class="standings" style="max-width:420px"></div>
-</section>
+    <!-- ═══ P6 — Podium ══════════════════════════════════════════ -->
+    <section class="screen centered" data-screen="podium">
+      <div class="mark"><span></span><span></span><span></span></div>
+      <h1 class="title">Fin de partie</h1>
+      <div id="podium-list" class="standings" style="max-width: 420px"></div>
+    </section>
 
-<!-- ═══ P7 — Résultats ════════════════════════════════════════ -->
-<section class="screen centered" data-screen="results">
-  <div class="mark"><span></span><span></span><span></span></div>
-  <h1 class="title">Résultats</h1>
-  <p class="tagline" id="results-party"></p>
-  <div id="standings" class="standings" style="max-width:420px"></div>
-</section>
+    <!-- ═══ P7 — Résultats ════════════════════════════════════════ -->
+    <section class="screen centered" data-screen="results">
+      <div class="mark"><span></span><span></span><span></span></div>
+      <h1 class="title">Résultats</h1>
+      <p class="tagline" id="results-party"></p>
+      <div id="standings" class="standings" style="max-width: 420px"></div>
+    </section>
 
-<!-- ═══ Chargement ════════════════════════════════════════════ -->
-<section class="screen centered active" data-screen="loading">
-  <div class="spinner"></div>
-</section>
+    <!-- ═══ Chargement ════════════════════════════════════════════ -->
+    <section class="screen centered active" data-screen="loading">
+      <div class="spinner"></div>
+    </section>
 
-<div class="connection-banner" id="connection-banner">
-  <span class="cb-dot"></span><span id="cb-text">Connexion perdue · reconnexion en cours…</span>
-</div>
-<div class="toast" id="toast"></div>
+    <div class="connection-banner" id="connection-banner">
+      <span class="cb-dot"></span
+      ><span id="cb-text">Connexion perdue · reconnexion en cours…</span>
+    </div>
+    <div class="toast" id="toast"></div>
 
-<script src="/socket.io/socket.io.js"></script>
-<script src="/shared/events.js"></script>
-<script src="/player/header.js"></script>
-<script src="/player/app.js"></script>
-<script src="/player/game.js"></script>
-</body>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/shared/events.js"></script>
+    <script src="/player/header.js"></script>
+    <script src="/player/app.js"></script>
+    <script src="/player/game.js"></script>
+  </body>
 </html>
