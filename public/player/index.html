@@ -12,22 +12,39 @@
     <link rel="stylesheet" href="/player/styles.css" />
   </head>
   <body>
-    <!-- ═══ HEADER permanent (pseudo + score) — repris de la v1 ═══ -->
-    <header class="player-header" id="player-header">
-      <div class="header-id">
-        <span class="header-dot" id="header-dot"></span>
-        <span class="header-name" id="header-name">—</span>
+    <!-- ═══ BARRE DU HAUT ═══════════════════════════════════════════
+     Trois configurations, une seule barre. Avant de choisir son nom,
+     la marque ; ensuite, l'identité ; en jeu, le score à droite plutôt
+     que l'état du salon, qui n'apprend plus rien une fois la partie
+     lancée. Le bloc « Soirée / Tu proposes en tant que… » qui doublait
+     cette information au-dessus de la collecte a disparu. -->
+    <header class="topbar" id="player-topbar">
+      <div class="topbar-left">
+        <div class="topbar-brand" id="pt-brand">
+          <div class="mark"><span></span><span></span><span></span></div>
+          <div class="title">Blind<span>List</span></div>
+        </div>
+        <div class="topbar-id hidden" id="pt-id">
+          <i class="rs-dot" id="header-dot"></i>
+          <span class="topbar-id-name" id="header-name">—</span>
+        </div>
       </div>
-      <div class="header-score-wrap">
-        <span class="header-score-label">Score</span>
-        <span class="header-score" id="header-score">0</span>
+      <div class="topbar-right">
+        <div class="room-status" id="pt-status">
+          <span class="rs-name">Soirée</span>
+          <span class="rs-state"
+            ><i class="rs-dot"></i><span class="rs-label">—</span></span
+          >
+        </div>
+        <div class="header-score-wrap hidden" id="pt-score">
+          <span class="header-score-label">Score</span>
+          <span class="header-score" id="header-score">0</span>
+        </div>
       </div>
     </header>
 
     <!-- ═══ V2 — Saisie du code ═══════════════════════════════════ -->
     <section class="screen centered" data-screen="code">
-      <div class="mark"><span></span><span></span><span></span></div>
-      <h1 class="title">Blind<span>List</span></h1>
       <p class="tagline">Saisis le code que l'hôte t'a communiqué.</p>
       <input
         id="code-input"
@@ -47,17 +64,11 @@
     </section>
 
     <!-- ═══ V3 — Choisir son nom ══════════════════════════════════ -->
-    <section class="screen" data-screen="claim">
-      <div class="mark"><span></span><span></span><span></span></div>
-      <h1 class="title" id="claim-party">Soirée</h1>
-      <p class="tagline">Touche ton nom dans la liste.</p>
+    <section class="screen centered" data-screen="claim">
+      <p class="tagline">Touche ton nom dans la liste, ou crée le tien.</p>
       <div id="claim-list" class="name-grid"></div>
 
-      <div
-        id="claim-create"
-        class="hidden"
-        style="width: 100%; max-width: 340px; margin-top: 1rem"
-      >
+      <div id="claim-create" class="hidden" style="margin-top: 1rem">
         <div class="sep-or"><span>ou</span></div>
         <input
           class="field"
@@ -84,15 +95,6 @@
 
     <!-- ═══ P1 — Collecte : recherche + panier ════════════════════ -->
     <section class="screen" data-screen="collect">
-      <div class="collect-head">
-        <div>
-          <div class="party-name" id="collect-party">Soirée</div>
-          <div class="who">
-            Tu proposes en tant que <b id="collect-me">…</b>
-          </div>
-        </div>
-      </div>
-
       <div class="collect-body">
         <div>
           <div class="search-row">
@@ -181,12 +183,8 @@
       <p class="tagline" id="wait-text">
         Les envois sont clos. Rendez-vous le jour J.
       </p>
-      <div id="wait-basket" class="name-grid" style="max-width: 420px"></div>
-      <button
-        class="btn ghost"
-        data-action="switch"
-        style="margin-top: 1.5rem; max-width: 320px"
-      >
+      <div id="wait-basket" class="name-grid"></div>
+      <button class="btn ghost" data-action="switch" style="margin-top: 1.5rem">
         Rejoindre une autre soirée
       </button>
     </section>
@@ -207,11 +205,10 @@
       <button
         class="vote-validate-btn"
         id="ready-btn"
-        style="max-width: 320px; margin-top: 1.8rem"
+        style="margin-top: 1.8rem"
       >
         Je suis prêt
       </button>
-      <p class="waiting-sub" id="ready-count" style="margin-top: 0.7rem"></p>
       <div class="waiting-countdown hidden" id="countdown">
         <span id="cd-num">3</span>
       </div>
@@ -260,15 +257,10 @@
       <button
         class="vote-validate-btn"
         id="reveal-ready-btn"
-        style="max-width: 340px; margin-top: 1rem"
+        style="margin-top: 1rem"
       >
         Je suis prêt pour la suite
       </button>
-      <p
-        class="waiting-sub"
-        id="reveal-ready-count"
-        style="margin-top: 0.6rem"
-      ></p>
       <!-- Le même décompte que sur l'écran d'attente. Sans lui, les trois
        secondes qui précèdent le lancement passent pour un plantage. -->
       <div class="waiting-countdown hidden" id="reveal-countdown">
@@ -280,7 +272,7 @@
     <section class="screen centered" data-screen="podium">
       <div class="mark"><span></span><span></span><span></span></div>
       <h1 class="title">Fin de partie</h1>
-      <div id="podium-list" class="standings" style="max-width: 420px"></div>
+      <div id="podium-list" class="standings"></div>
     </section>
 
     <!-- ═══ P7 — Résultats ════════════════════════════════════════ -->
@@ -288,7 +280,7 @@
       <div class="mark"><span></span><span></span><span></span></div>
       <h1 class="title">Résultats</h1>
       <p class="tagline" id="results-party"></p>
-      <div id="standings" class="standings" style="max-width: 420px"></div>
+      <div id="standings" class="standings"></div>
     </section>
 
     <!-- ═══ Chargement ════════════════════════════════════════════ -->
@@ -302,6 +294,7 @@
     </div>
     <div class="toast" id="toast"></div>
 
+    <script src="/shared/room-status.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script src="/shared/events.js"></script>
     <script src="/player/header.js"></script>

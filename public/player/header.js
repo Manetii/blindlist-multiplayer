@@ -9,17 +9,41 @@
  */
 
 window.PlayerHeader = (() => {
-  const headerEl = document.getElementById('player-header');
+  const brandEl  = document.getElementById('pt-brand');
+  const idEl     = document.getElementById('pt-id');
+  const statusEl = document.getElementById('pt-status');
+  const scoreEl_ = document.getElementById('pt-score');
   const dotEl    = document.getElementById('header-dot');
   const nameEl   = document.getElementById('header-name');
   const scoreEl  = document.getElementById('header-score');
 
+  /**
+   * Identité du joueur : elle remplace la marque dès qu'un nom est
+   * revendiqué. Garder les deux aurait demandé une barre deux fois
+   * plus haute sur l'écran le plus étroit du projet.
+   */
   function setPseudo(pseudo, color) {
-    if (!headerEl) return;
+    if (!nameEl) return;
     nameEl.textContent = pseudo;
     dotEl.style.background = color;
-    dotEl.style.boxShadow  = `0 0 12px ${color}`;
-    headerEl.classList.add('visible');
+    dotEl.style.boxShadow  = `0 0 .6rem ${color}`;
+    if (brandEl) brandEl.classList.add('hidden');
+    if (idEl) idEl.classList.remove('hidden');
+  }
+
+  /** Nom et état du salon, côté droit. */
+  function setRoom(opts) {
+    if (window.RoomStatus) RoomStatus.render(statusEl, opts);
+  }
+
+  /**
+   * En jeu, le score prend la place de l'état du salon : une fois la
+   * partie lancée, « en ligne » n'apprend plus rien, alors que son
+   * score est ce qu'on vérifie à chaque manche.
+   */
+  function showScore(on) {
+    if (statusEl) statusEl.classList.toggle('hidden', !!on);
+    if (scoreEl_) scoreEl_.classList.toggle('hidden', !on);
   }
 
   function setScore(n) {
@@ -32,7 +56,7 @@ window.PlayerHeader = (() => {
     setTimeout(() => scoreEl.classList.remove('bump'), 400);
   }
 
-  function hide() { if (headerEl) headerEl.classList.remove('visible'); }
+  function hide() { showScore(false); }
 
-  return { setPseudo, setScore, hide };
+  return { setPseudo, setScore, setRoom, showScore, hide };
 })();

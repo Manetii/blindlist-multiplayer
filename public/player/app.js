@@ -45,8 +45,32 @@
   const $  = (sel) => document.querySelector(sel);
   const $$ = (sel) => document.querySelectorAll(sel);
 
+  /**
+   * Bascule d'écran, et avec elle la configuration de la barre du haut.
+   *
+   * Trois configurations : avant d'avoir un nom, la marque et l'état du
+   * salon ; pendant la collecte et l'attente, l'identité et l'état ;
+   * en jeu, l'identité et le score. La règle vit ici plutôt que
+   * dispersée dans chaque rendu, sinon un écran finit toujours par
+   * l'oublier.
+   */
+  const GAME_SCREENS = new Set(['vote', 'reveal', 'podium', 'results']);
+
   function show(name) {
     $$('[data-screen]').forEach(el => el.classList.toggle('active', el.dataset.screen === name));
+
+    if (window.PlayerHeader) {
+      PlayerHeader.showScore(GAME_SCREENS.has(name));
+      if (state.party) {
+        PlayerHeader.setRoom({
+          name: state.party.name,
+          partyState: state.party.state,
+          roomOpen: GAME_SCREENS.has(name) || name === 'waiting',
+          connected: navigator.onLine !== false,
+          roundActive: name === 'vote' || name === 'reveal',
+        });
+      }
+    }
   }
 
   function esc(s) {
@@ -178,7 +202,12 @@
 
   function renderClaim(data) {
     state.party = data.party;
-    $('#claim-party').textContent = data.party.name;
+    // Le nom de la soirée est dans la barre du haut : show() l'y écrit
+    // dès que state.party existe.
+    if (window.PlayerHeader) {
+      PlayerHeader.setRoom({ name: data.party.name, partyState: data.party.state,
+                             connected: true });
+    }
 
     // Auto-inscription : proposée seulement si la soirée l'autorise.
     // Sinon le joueur choisirait un nom que l'hôte n'attend pas, et
@@ -330,7 +359,9 @@
     state.submitted = data.submitted === true;
 
     // Le bandeau pseudo/score n'a de sens que pendant la partie.
-    if (data.screen !== 'jeu' && window.PlayerHeader) window.PlayerHeader.hide();
+    // La barre reste en place quel que soit l'écran ; seule la partie
+    // droite change, et show() s'en charge.
+
 
     schedulePoll(data.screen);
     startWatching();
@@ -355,10 +386,9 @@
   // ═══════════════════════════════════════════════════════════
 
   function renderCollect() {
-    $('#collect-party').textContent = state.party.name;
-    const me = $('#collect-me');
-    me.textContent = state.me.displayName;
-    me.style.setProperty('--c', state.me.color);
+    // Nom de soirée et identité vivent dans la barre du haut : les
+    // répéter en tête d'écran mangeait un tiers de la hauteur utile
+    // d'un téléphone pour redire deux mots déjà lus.
     renderQuota();
     renderBasket();
     renderSubmit();

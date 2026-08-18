@@ -148,15 +148,10 @@ window.PlayerGame = (() => {
     });
 
     socket.on(EVENTS.STATE_READY_PROGRESS, (t) => {
-      // Le même décompte alimente l'écran d'attente ET celui de
-      // révélation : le joueur voit où en est la table sans changer
-      // d'écran.
-      const txt = t.pending.length
-        ? `${t.ready}/${t.connected} prêts · on attend ${t.pending.join(', ')}`
-        : `${t.ready}/${t.connected} prêts`;
-      const a = $('#ready-count'), b = $('#reveal-ready-count');
-      if (a) a.textContent = txt;
-      if (b) b.textContent = txt;
+      // Le décompte n'est plus affiché côté joueur : nommer les
+      // retardataires est le travail de l'écran que la salle regarde,
+      // et le voir aussi sur son téléphone transformait l'attente en
+      // pression. Seul l'état du bouton reste synchronisé.
       const me = t.pendingIds ? !t.pendingIds.includes((g.me || {}).id) : g.ready;
       g.ready = me;
       updateReadyBtn();

@@ -12,10 +12,12 @@
     <!-- ═══ H1 — Créer ou choisir une soirée ═══════════════════════ -->
     <section class="view" data-view="pick">
       <header class="topbar">
-        <div class="mark"><span></span><span></span><span></span></div>
-        <div class="title" style="font-size: 1.5rem">
-          Blind<span>List</span>
+        <div class="topbar-left"></div>
+        <div class="topbar-brand">
+          <div class="mark"><span></span><span></span><span></span></div>
+          <div class="title">Blind<span>List</span></div>
         </div>
+        <div class="topbar-right"></div>
       </header>
 
       <div class="wrap narrow">
@@ -67,27 +69,20 @@
     <!-- ═══ H0 — Console d'une soirée ══════════════════════════════ -->
     <section class="view" data-view="console">
       <header class="topbar">
-        <a href="/h" class="btn ghost sm">←</a>
-        <div>
-          <div class="party-name" id="c-name">Soirée</div>
-          <div class="eyebrow" id="c-state">collecte</div>
+        <div class="topbar-left">
+          <a href="/h" class="topbar-btn" title="Retour à l'accueil">←</a>
         </div>
-        <div
-          style="
-            margin-left: auto;
-            display: flex;
-            gap: 0.5rem;
-            align-items: center;
-          "
-        >
-          <span class="muted small" id="c-refreshed"></span>
-          <button
-            class="btn ghost sm"
-            id="btn-refresh"
-            title="Actualiser joueurs et morceaux"
-          >
-            ↻ Actualiser
-          </button>
+        <div class="topbar-brand">
+          <div class="mark"><span></span><span></span><span></span></div>
+          <div class="title">Blind<span>List</span></div>
+        </div>
+        <div class="topbar-right">
+          <div class="room-status" id="c-status">
+            <span class="rs-name">Soirée</span>
+            <span class="rs-state"
+              ><i class="rs-dot"></i><span class="rs-label">—</span></span
+            >
+          </div>
         </div>
       </header>
 
@@ -97,9 +92,11 @@
           <div>
             <div class="eyebrow">Code de la soirée</div>
             <div class="code" id="c-code">····</div>
-            <div class="share-url" id="c-url"></div>
+            <!-- L'URL en toutes lettres occupait trois lignes pour une
+             information que personne ne recopie à la main : le code
+             au-dessus et le QR à côté suffisent. -->
             <div class="share-actions">
-              <button class="btn ghost sm" id="c-copy">Copier le lien</button>
+              <button class="btn sm" id="c-invite">Inviter</button>
             </div>
             <div id="c-net" class="hidden" style="margin-top: 0.75rem"></div>
           </div>
@@ -176,6 +173,20 @@
 
           <div class="card-head" style="margin-top: 1.5rem">
             <h2>Où en sont-ils</h2>
+            <!-- Ici, et pas dans la barre du haut : c'est l'avancement des
+             paniers qu'on rafraîchit, et lui seul bouge tout seul. -->
+            <span
+              class="muted small"
+              id="c-refreshed"
+              style="margin-left: auto"
+            ></span>
+            <button
+              class="btn ghost sm"
+              id="btn-refresh"
+              title="Actualiser joueurs et morceaux"
+            >
+              ↻ Actualiser
+            </button>
           </div>
           <div id="prog-list" class="stack"></div>
 
@@ -345,6 +356,7 @@
     </section>
 
     <div class="toast" id="toast"></div>
+    <script src="/shared/room-status.js"></script>
     <script src="/shared/matching.js"></script>
     <script src="/shared/folder-store.js"></script>
     <script src="/host/app.js"></script>

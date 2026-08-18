@@ -13,43 +13,49 @@
       <div class="topbar-left">
         <a
           href="/h"
-          class="btn-topbar-icon"
+          class="topbar-btn"
           id="back-console"
           title="Retour à la console de préparation"
           >←</a
         >
-        <div class="topbar-logo">
-          <span class="topbar-logo-text">Blind<span>List</span></span>
-        </div>
-        <button class="tab-btn" id="tab-players" title="Panneau Joueurs (J)">
-          <span class="tab-icon">👥</span><span class="tab-label">Joueurs</span>
+        <!-- Icônes seules : les quatre panneaux se retiennent en une
+         soirée, et les libellés poussaient la marque hors du centre. -->
+        <button class="topbar-btn" id="tab-players" title="Panneau Joueurs (J)">
+          👥
         </button>
-        <button class="tab-btn" id="tab-playlist" title="Panneau Playlist (P)">
-          <span class="tab-icon">🎵</span
-          ><span class="tab-label">Playlist</span>
-        </button>
-      </div>
-      <div class="topbar-right">
-        <span class="brand-sub" id="g-name">Soirée</span>
-        <span class="room-code" id="g-code">····</span>
-        <span class="conn-indicator"
-          ><span class="conn-dot" id="conn-dot"></span
-          ><span class="conn-label" id="conn-label">…</span></span
-        >
         <button
-          class="btn-topbar-icon"
+          class="topbar-btn"
+          id="tab-playlist"
+          title="Panneau Playlist (P)"
+        >
+          🎵
+        </button>
+        <button
+          class="topbar-btn"
           id="btn-mode-tv"
           title="Mode TV : fermer tous les panneaux"
         >
           🖥
         </button>
-        <button
-          class="btn-topbar-icon"
-          id="btn-help"
-          title="Raccourcis clavier (?)"
-        >
+        <button class="topbar-btn" id="btn-help" title="Raccourcis clavier (?)">
           ?
         </button>
+      </div>
+      <div class="topbar-brand">
+        <div class="mark"><span></span><span></span><span></span></div>
+        <div class="title">Blind<span>List</span></div>
+      </div>
+      <div class="topbar-right">
+        <div class="room-status" id="g-status">
+          <span class="rs-name" id="g-name">Soirée</span>
+          <!-- Le statut de lecture rejoint l'état du salon : c'est la même
+           question — où en est la salle — et elle occupait une ligne au
+           milieu du lecteur. -->
+          <span class="rs-state"
+            ><i class="rs-dot" id="conn-dot"></i
+            ><span class="rs-label" id="conn-label">…</span></span
+          >
+        </div>
       </div>
     </header>
 
@@ -60,7 +66,7 @@
         <aside class="col-players">
           <div class="panel-header">
             <h2 class="panel-title">
-              Joueurs <span class="playlist-count" id="pl-count"></span>
+              Joueurs · <span class="playlist-count" id="pl-count"></span>
             </h2>
             <button class="panel-close" id="close-players" title="Fermer">
               ×
@@ -68,6 +74,20 @@
           </div>
           <div class="panel-body" id="pl-list"></div>
           <div class="ready-strip" id="ready-strip"></div>
+
+          <!-- Code et QR au pied du panneau joueurs.
+           Ils n'ont plus rien à faire dans la barre du haut une fois la
+           soirée lancée — mais ils redeviennent indispensables au pire
+           moment : un téléphone qui décroche, un retardataire qui
+           arrive. Les chercher est alors le geste qu'on fait en
+           regardant qui manque, c'est-à-dire ici. -->
+          <details class="rejoin">
+            <summary>Rejoindre la soirée</summary>
+            <div class="rejoin-body">
+              <div class="room-code" id="g-code">····</div>
+              <div class="rejoin-qr" id="g-qr"></div>
+            </div>
+          </details>
         </aside>
 
         <!-- ─── Centre : lecteur ─── -->
@@ -173,17 +193,9 @@
                 </button>
               </div>
 
-              <div class="end-actions">
-                <button class="btn-end-match" id="btn-end">
-                  Terminer la partie
-                </button>
-                <!-- Séparé de « Charger le dossier », qu'il jouxtait : son
-                 libellé promettait des morceaux, il efface aussi les
-                 scores. -->
-                <button class="btn-end-match" id="btn-reset-played">
-                  ↺ Rejouer toute la playlist (scores remis à zéro)
-                </button>
-              </div>
+              <button class="btn-end-match" id="btn-end">
+                Terminer la partie
+              </button>
             </div>
           </div>
 
@@ -207,8 +219,7 @@
         <section class="col-playlist">
           <div class="panel-header">
             <h2 class="panel-title">
-              Playlist <span class="playlist-count" id="tr-count"></span
-              ><span class="jukebox-hint" id="jukebox-hint"></span>
+              Playlist · <span class="playlist-count" id="tr-count"></span>
             </h2>
             <button class="panel-close" id="close-playlist" title="Fermer">
               ×
@@ -247,6 +258,15 @@
             />
             <button class="btn-reset-played" id="g-folder-btn">
               📁 Charger le dossier des morceaux
+            </button>
+            <!-- Séparé du chargement de dossier par un trait : son libellé
+             promettait des morceaux, il efface aussi les scores. -->
+            <button
+              class="btn-reset-played danger-action"
+              id="btn-reset-played"
+              title="Remet tous les morceaux en jeu ET remet les scores à zéro"
+            >
+              ↺ Rejouer toute la playlist (scores à zéro)
             </button>
             <div id="g-folder-report" class="folder-report"></div>
           </div>
@@ -360,6 +380,7 @@
     <canvas id="confetti-canvas"></canvas>
     <div class="toast" id="toast"></div>
 
+    <script src="/shared/room-status.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script src="/shared/events.js"></script>
     <script src="/shared/folder-store.js"></script>

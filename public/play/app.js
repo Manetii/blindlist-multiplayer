@@ -238,8 +238,10 @@
       renderOptions();
       S.players = res.state.players;
       S.tracks = res.tracks;
-      $('#g-name').textContent = res.state.room.name;
+      S.name = res.state.room.name;
+      renderRoomStatus();
       $('#g-code').textContent = res.state.room.code;
+      renderRejoinQR();
       S.paused = res.state.room.paused;
 
       // Reprise après coupure : le serveur dit ce qui reste à faire.
@@ -262,9 +264,48 @@
     });
   }
 
+  /**
+   * État du salon dans la barre du haut.
+   *
+   * Un seul endroit dit désormais où en est la salle : connexion,
+   * salon ouvert et manche en cours étaient exposés à trois endroits
+   * différents de l'écran.
+   */
   function setConn(on) {
-    $('#conn-label').textContent = on ? 'en ligne' : 'hors ligne';
-    $('#conn-dot').className = 'conn-dot' + (on ? ' on' : '');
+    S.connected = on;
+    renderRoomStatus();
+  }
+
+  /**
+   * QR de secours, au pied du panneau joueurs.
+   *
+   * Chargé à la demande et une seule fois : un appel réseau au
+   * démarrage du lecteur pour une image qui ne sert qu'en cas de
+   * pépin serait mal placé.
+   */
+  let qrDone = false;
+  function renderRejoinQR() {
+    const el = $('#g-qr');
+    if (!el || qrDone || !S.code) return;
+    qrDone = true;
+    const url = `${location.origin}/j/${S.code}`;
+    const img = new Image();
+    img.alt = 'QR code pour rejoindre la soirée';
+    img.onload = () => { el.innerHTML = ''; el.appendChild(img); };
+    img.onerror = () => {
+      el.innerHTML = '<div class="fallback">QR indisponible hors ligne — dicte le code.</div>';
+    };
+    img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=6&data='
+            + encodeURIComponent(url);
+  }
+
+  function renderRoomStatus() {
+    RoomStatus.render($('#g-status'), {
+      name: S.name || 'Soirée',
+      connected: S.connected !== false,
+      roomOpen: true,
+      roundActive: !!(S.round && S.round.active !== false),
+    });
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -614,6 +655,7 @@
 
 
   function renderAll() {
+    renderRoomStatus();
     renderNowPlaying();
     renderPlayers();
     renderTracks();
@@ -794,7 +836,6 @@
         el.addEventListener('click', () => preview(el.dataset.track));
       });
     }
-    $('#jukebox-hint').textContent = jukeboxOpen() ? '· clic = écouter' : '';
   }
 
   /**
@@ -1011,8 +1052,10 @@
     const { ok, data } = await api('GET', `/api/host/parties/${S.code}/tracks`);
     if (!ok) { toast('Playlist introuvable.', true); return; }
     S.tracks = data.tracks;
-    $('#g-name').textContent = known.name || 'Partie';
+    S.name = known.name || 'Partie';
+    renderRoomStatus();
     $('#g-code').textContent = S.code;
+    renderRejoinQR();
 
     // Le salon s'ouvre IMMÉDIATEMENT : arriver ici, c'est déjà être
     // dans sa soirée. Le chargement du dossier n'est plus une étape

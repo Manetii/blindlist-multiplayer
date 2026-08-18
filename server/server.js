@@ -8,7 +8,6 @@
  *    /login            accès administration (si ADMIN_PASSWORD défini)
  *    /h                console hôte (PC)
  *    /h/:code          console d'une soirée
- *    /prepare          vérification des fichiers
  *    /admin            supervision                 — protégée
  *    /j/:code          choisir son nom dans la liste
  *    /p/:code/:token   espace participant (lien magique)
@@ -145,7 +144,8 @@ app.get('/h/:code',  page('host'));
 // Express retient la première route qui correspond, et /h/:code ne
 // capture pas un second segment.
 app.get('/h/:code/play', page('play'));
-app.get('/prepare',  page('prepare'));
+// /prepare a été supprimée : la vérification des fichiers se fait dans
+// la console, et la page ne servait plus qu'un placeholder en production.
 app.get('/admin',    auth.requireAdminPage, page('admin'));
 
 /**

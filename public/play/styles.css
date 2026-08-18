@@ -16,6 +16,13 @@
    y perdait donc ses couleurs en silence. */
 @import url('/shared/base.css');
 
+:root {
+  /* Largeur des panneaux latéraux. 300 et 340 px à la taille de
+     référence de 18 px observée sur un 1080p. */
+  --panel-l: 16.7rem;
+  --panel-r: 18.9rem;
+}
+
 body {
   /* 100dvh et non 100vh : sur mobile, 100vh ignore la barre d'URL, le
      bas de l'interface est coupe et overflow:hidden interdit d'aller
@@ -26,66 +33,56 @@ body {
 .view { display: none; flex: 1; min-height: 0; }
 .view.active { display: flex; }
 
-/* ─── TOPBAR ─── */
-.topbar {
-  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-  padding: .6rem 1rem; background: var(--surface);
-  border-bottom: 1px solid var(--border); flex-shrink: 0;
+/* ─── TOPBAR ───
+   La structure vient de base.css : trois zones, marque au centre,
+   hauteur commune à toutes les vues. Ne restent ici que les éléments
+   propres au lecteur. */
+.topbar { flex-shrink: 0; }
+.topbar-btn.active {
+  background: rgba(0,229,255,.12); border-color: var(--accent); color: var(--accent);
 }
-.topbar-left { display: flex; align-items: center; gap: .5rem; }
-.topbar-logo-text { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; letter-spacing: .12em; color: var(--accent); margin-right: .5rem; }
-.topbar-logo-text span { color: var(--text); }
-
-/* Onglets : ils indiquent l'état du panneau autant qu'ils le pilotent. */
-.tab-btn {
-  display: flex; align-items: center; gap: .4rem;
-  background: var(--surface2); border: 1px solid var(--border);
-  border-radius: 8px; color: var(--muted);
-  font-family: 'Outfit', sans-serif; font-size: .8rem;
-  padding: .4rem .8rem; cursor: pointer; transition: all .2s;
-}
-.tab-btn:hover { border-color: var(--accent); color: var(--text); }
-.tab-btn.active {
-  background: rgba(0,229,255,.12); border-color: var(--accent);
-  color: var(--accent); box-shadow: 0 0 16px rgba(0,229,255,.18);
-}
-.tab-icon { font-size: 1rem; line-height: 1; }
 #btn-mode-tv.active { background: var(--accent); border-color: var(--accent); color: #061119; }
-.brand-sub { font-size: .75rem; color: var(--muted); }
-.topbar-right { display: flex; align-items: center; gap: .7rem; }
+/* ─── Rejoindre : code + QR au pied du panneau joueurs ─── */
+.rejoin { border-top: 1px solid var(--border); flex-shrink: 0; }
+.rejoin summary {
+  padding: .6rem .9rem; cursor: pointer; list-style: none;
+  font-size: var(--t-micro); letter-spacing: .18em; text-transform: uppercase;
+  color: var(--muted); user-select: none;
+}
+.rejoin summary::-webkit-details-marker { display: none; }
+.rejoin summary::after { content: ' ▾'; }
+.rejoin[open] summary::after { content: ' ▴'; }
+.rejoin summary:hover { color: var(--text); }
+.rejoin-body { padding: 0 .9rem .9rem; text-align: center; }
+.rejoin-qr img {
+  display: block; margin: .5rem auto 0; background: #fff;
+  border-radius: var(--r-sm); padding: .3rem; width: 8rem; height: 8rem;
+}
+.rejoin-qr .fallback { font-size: var(--t-micro); color: var(--muted); }
+
 .room-code {
-  font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem;
+  display: block; text-align: center;
+  font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem;
   /* Demi-valeur du letter-spacing : voir .code dans host/styles.css. */
   letter-spacing: .22em; color: var(--accent); text-indent: .11em;
 }
-.conn-indicator {
-  display: flex; align-items: center; gap: .4rem;
-  font-size: .6rem; letter-spacing: .15em; text-transform: uppercase; color: var(--muted);
-}
-.conn-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--danger); }
-.conn-dot.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
-
-.btn-topbar-icon {
-  width: 36px; height: 36px; background: var(--surface);
-  border: 1px solid var(--border); color: var(--muted);
-  font-size: 1.05rem; border-radius: 9px; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  transition: all .2s; text-decoration: none;
-}
-.btn-topbar-icon:hover { border-color: var(--warn); color: var(--warn); }
 
 /* ─── MISE EN PAGE ─── */
 .layout {
   flex: 1; display: grid; grid-template-rows: 1fr; overflow: hidden;
-  grid-template-columns: 300px 1fr 340px;
+  /* En rem : figes en px, les panneaux gardaient la meme largeur
+     physique d'un 1080p a un 1440p, ou ils paraissaient donc etroits
+     alors que tout le reste avait grandi. Les valeurs reprennent le
+     rapport observe en 1080p. */
+  grid-template-columns: var(--panel-l) 1fr var(--panel-r);
   transition: grid-template-columns .35s cubic-bezier(.4,0,.2,1);
 }
 /* L'état des panneaux se pilote par des classes sur <body> : c'est ce
    qui permet au vinyle et au titre de réagir aussi. */
 body.panels-all-closed .layout { grid-template-columns: 0 1fr 0; }
-body.panel-players-open:not(.panel-playlist-open) .layout { grid-template-columns: 300px 1fr 0; }
-body:not(.panel-players-open).panel-playlist-open .layout { grid-template-columns: 0 1fr 340px; }
-body.panel-players-open.panel-playlist-open .layout { grid-template-columns: 300px 1fr 340px; }
+body.panel-players-open:not(.panel-playlist-open) .layout { grid-template-columns: var(--panel-l) 1fr 0; }
+body:not(.panel-players-open).panel-playlist-open .layout { grid-template-columns: 0 1fr var(--panel-r); }
+body.panel-players-open.panel-playlist-open .layout { grid-template-columns: var(--panel-l) 1fr var(--panel-r); }
 
 .col-players, .col-playlist {
   background: var(--surface); display: flex; flex-direction: column;
@@ -234,7 +231,13 @@ body.indices-hidden .btn-toggle-indices {
 
 /* Les deux sorties de partie, groupées et discrètes : ni l'une ni
    l'autre ne doit se cliquer par inadvertance. */
-.end-actions { display: flex; flex-direction: column; align-items: center; gap: .15rem; }
+/* Action destructrice au pied du panneau playlist : détachée du
+   bouton voisin par un trait, pour qu'on ne l'atteigne pas d'un
+   glissement de souris. */
+.danger-action {
+  margin-top: .5rem; padding-top: .5rem;
+  border-top: 1px solid var(--border); color: var(--warn) !important;
+}
 .vol-icon { font-size: .9rem; color: var(--muted); }
 .volume-slider { flex: 1; accent-color: var(--accent); height: 4px; }
 .vol-val { font-family: 'Bebas Neue', sans-serif; font-size: .85rem; color: var(--muted); min-width: 3ch; }
@@ -266,7 +269,10 @@ body.indices-hidden .btn-toggle-indices {
 .btn-game-action {
   background: var(--surface2); color: var(--text); border: 1px solid var(--border);
   border-radius: 12px; font-family: 'Bebas Neue', sans-serif;
-  font-size: 1.2rem; letter-spacing: .1em; padding: .9rem 2rem; min-width: 280px;
+  /* Pas de min-width en px : entre 900 et 1100 px, la colonne centrale
+     tombe sous 280 px et le bouton débordait. */
+  font-size: 1.2rem; letter-spacing: .1em; padding: .9rem 2rem;
+  width: 100%; max-width: 22rem;
   cursor: pointer; display: flex; align-items: center; justify-content: center; gap: .6rem;
   transition: all .18s cubic-bezier(.34,1.56,.64,1);
 }
@@ -436,21 +442,11 @@ body.indices-hidden .btn-toggle-indices {
 .folder-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; letter-spacing: .08em; font-weight: 400; }
 .folder-text { color: var(--muted); font-size: .88rem; }
 .folder-report { width: 100%; }
-.banner { border-radius: var(--radius); padding: .7rem .9rem; font-size: .82rem; text-align: left; }
-.banner.good { background: rgba(6,214,160,.08); border: 1px solid #17553f; color: var(--ok); }
-.banner.warn { background: rgba(255,209,102,.08); border: 1px solid #6b5a20; color: var(--warn); }
-.banner.bad  { background: rgba(255,107,107,.08); border: 1px solid #5a2020; color: var(--danger); }
+/* Les bandeaux viennent de la base. */
 
 canvas#confetti-canvas { position: fixed; inset: 0; pointer-events: none; z-index: 3000; }
 
-.toast {
-  position: fixed; left: 50%; bottom: 1.5rem; z-index: 4000;
-  transform: translate(-50%, 1rem); opacity: 0; pointer-events: none;
-  background: var(--surface2); border: 1px solid var(--border);
-  border-radius: 999px; padding: .55rem 1.1rem; font-size: .82rem; transition: all .2s;
-}
-.toast.show { opacity: 1; transform: translate(-50%, 0); }
-.toast.err { border-color: var(--danger); color: var(--danger); }
+/* Le toast vient de la base. */
 
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -524,27 +520,8 @@ canvas#confetti-canvas { position: fixed; inset: 0; pointer-events: none; z-inde
 .btn-reset-played:disabled { opacity: .3; cursor: not-allowed; }
 
 /* ─── Options de partie ─── */
-.options-section {
-  padding: .85rem 1.25rem 1rem; border-top: 1px solid var(--border);
-  flex-shrink: 0; display: flex; flex-direction: column; gap: .4rem;
-}
-.section-label-small {
-  font-family: 'Bebas Neue', sans-serif; font-size: .75rem;
-  letter-spacing: .18em; color: var(--muted); opacity: .6;
-}
-.match-option {
-  display: flex; align-items: center; gap: .5rem;
-  font-size: .78rem; cursor: pointer; user-select: none;
-}
-.match-option input[type="checkbox"] { width: 14px; height: 14px; cursor: pointer; accent-color: var(--accent); }
-.match-range { gap: .6rem; }
-.match-range label { flex-shrink: 0; cursor: pointer; }
-.match-range input[type="range"] { flex: 1; min-width: 0; accent-color: var(--accent); cursor: pointer; }
-.match-range output {
-  flex-shrink: 0; min-width: 3.2ch; text-align: right;
-  font-family: 'Bebas Neue', sans-serif; letter-spacing: .06em; color: var(--accent);
-}
-.match-option em { font-style: italic; opacity: .7; }
+/* Les options de jeu sont passées dans la console : leurs styles
+   n'avaient plus de balisage à habiller. */
 
 /* ─── Aide raccourcis ─── */
 .help-overlay {
@@ -617,7 +594,6 @@ canvas#confetti-canvas { position: fixed; inset: 0; pointer-events: none; z-inde
 body.round-active .tr-play { opacity: .25; pointer-events: none; }
 body.round-active .track-item { cursor: default; }
 
-.jukebox-hint { color: var(--accent); text-transform: none; letter-spacing: 0; font-size: .6rem; }
 
 /* Chargement du dossier depuis le panneau playlist. */
 .folder-report { margin-top: .5rem; }

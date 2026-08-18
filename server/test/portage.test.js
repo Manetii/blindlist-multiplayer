@@ -12,7 +12,9 @@ const js  =await (await fetch(B+'/player/game.js')).text();
 const hdr =await (await fetch(B+'/player/header.js')).text();
 
 // Balisage d'origine present
-for(const id of ['player-header','header-dot','header-name','header-score',
+// 'player-header' a fondu dans la barre du haut partagee : l'identite
+// et le score y sont, mais dans le composant commun a toutes les vues.
+for(const id of ['player-topbar','header-dot','header-name','header-score',
                  'waiting-title','waiting-sub','vote-grid','vote-status','vote-validate-btn',
                  'reveal-title','reveal-artist','reveal-player','reveal-player-dot',
                  'reveal-verdict','reveal-art','reveal-art-placeholder'])

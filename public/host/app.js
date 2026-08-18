@@ -237,11 +237,16 @@
 
   function render() {
     const p = state.party;
-    $('#c-name').textContent = p.name;
-    $('#c-state').textContent = p.state;
+    // Nom et état dans le composant partagé : la console disait
+    // « collecte » en petites capitales, le lecteur affichait une
+    // pastille sans mot, et les deux parlaient de la même chose.
+    RoomStatus.render($('#c-status'), {
+      name: p.name,
+      partyState: p.state,
+      roomOpen: p.state === 'en_jeu',
+    });
     $('#c-code').textContent = p.code;
 
-    $('#c-url').textContent = shareUrl();
     renderQR(shareUrl());
     checkNetwork();
 
@@ -1209,18 +1214,18 @@
       e.target.value = '';   // permet de resélectionner le même dossier
     });
 
-    $('#c-copy').addEventListener('click', async () => {
+    /*
+     * Inviter — copie, rien de plus.
+     *
+     * Le partage natif ouvre une fenêtre système sur PC : trop lourd
+     * pour un geste dont l'hôte enchaîne aussitôt avec un collage dans
+     * sa conversation. Le repli n'est là que pour le HTTP simple, où
+     * l'API presse-papiers n'existe pas.
+     */
+    $('#c-invite').addEventListener('click', async () => {
       const url = shareUrl();
       try { await navigator.clipboard.writeText(url); toast('Lien copié.'); }
-      catch {
-        // clipboard indisponible hors HTTPS : on sélectionne pour que
-        // l'hôte n'ait plus qu'à faire Ctrl+C.
-        const range = document.createRange();
-        range.selectNodeContents($('#c-url'));
-        getSelection().removeAllRanges();
-        getSelection().addRange(range);
-        toast('Sélectionne et copie le lien.');
-      }
+      catch { prompt('Copie ce lien et envoie-le :', url); }
     });
   }
 

@@ -18,14 +18,14 @@
 .view { display: none; }
 .view.active { display: block; }
 
-.wrap { max-width: 980px; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; }
-.wrap.narrow { max-width: 560px; }
+/* En rem, pour suivre la taille de référence fluide de base.css :
+   en px, la console gardait la même taille physique d'un 1080p à un
+   4K et imposait de zoomer. */
+.wrap { max-width: 61rem; margin: 0 auto; padding: var(--s5) var(--s4) var(--s6); }
+.wrap.narrow { max-width: 34rem; }
 
-.topbar {
-  display: flex; align-items: center; gap: .9rem;
-  padding: .9rem 1.25rem; border-bottom: 1px solid var(--border);
-  background: var(--surface); position: sticky; top: 0; z-index: 10;
-}
+/* .topbar vient de base.css : trois zones, marque centrée, hauteur
+   commune à toutes les vues du projet. */
 .party-name { font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; letter-spacing: .06em; line-height: 1.1; }
 
 .card { margin-bottom: 1rem; }
@@ -53,8 +53,8 @@
 .share-url { font-size: .78rem; color: var(--muted); word-break: break-all; user-select: all; }
 .share-actions { margin-top: .7rem; }
 .qr { flex-shrink: 0; }
-.qr img { display: block; border-radius: 8px; background: #fff; padding: 6px; width: 148px; height: 148px; }
-.qr .fallback { width: 148px; text-align: center; font-size: .7rem; color: var(--muted); }
+.qr img { display: block; border-radius: var(--r-sm); background: #fff; padding: .35rem; width: 9rem; height: 9rem; }
+.qr .fallback { width: 9rem; text-align: center; font-size: .7rem; color: var(--muted); }
 
 /* ─── SIGNATURE : le fil des étapes ──────────────────────────── */
 
@@ -144,8 +144,12 @@
   .share { flex-direction: column; align-items: flex-start; }
   .qr { align-self: center; }
   .row2 { grid-template-columns: 1fr; }
-  .steps { display: none; }
-  .card.dim { display: none; }
+  /* Le fil des étapes RESTE affiché : c'est l'élément signature de la
+     console et le seul repère de séquence. Une règle plus bas dans ce
+     fichier le remettait d'ailleurs en flex, rendant celle-ci morte. */
+  /* Ne PAS masquer : faire disparaître du contenu à un point de rupture
+     laisse l'hôte sans indice qu'il existe. L'atténuation suffit. */
+  .card.dim { opacity: .45; }
 }
 
 /* ════════════════════════════════════════════════════════════════
