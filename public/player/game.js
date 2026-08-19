@@ -178,6 +178,23 @@ window.PlayerGame = (() => {
       banner.hostOffline = !online; renderBanner();
     });
 
+    /*
+     * Filet : tout signe de vie lève le bandeau.
+     *
+     * Le retour de l'hôte est annoncé par un seul message. S'il se perd
+     * — un joueur qui rejoint pile entre l'émission et son entrée dans
+     * le salon, une reconnexion socket au mauvais moment — le bandeau
+     * reste affiché pour le reste de la soirée alors que tout
+     * fonctionne. Or n'importe quel autre message venant du salon
+     * prouve qu'un hôte est là : une manche ne démarre pas toute seule.
+     */
+    socket.onAny((event) => {
+      if (event === EVENTS.STATE_HOST_STATUS) return;   // lui seul peut l'allumer
+      if (!banner.hostOffline) return;
+      banner.hostOffline = false;
+      renderBanner();
+    });
+
     socket.on(EVENTS.STATE_GAME_OVER, ({ standings }) => renderPodium(standings));
     socket.on(EVENTS.STATE_ROOM_CLOSED, () => window.PlayerApp.reresolve());
   }

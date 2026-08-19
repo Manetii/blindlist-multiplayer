@@ -24,12 +24,14 @@ const { limit } = require('../lib/rate-limit');
 
 const partyRepo       = require('../repos/party.repo');
 const participantRepo = require('../repos/participant.repo');
+const notify = require('../lib/notify');
 const trackRepo       = require('../repos/track.repo');
 const sessionRepo     = require('../repos/session.repo');
 const Rooms           = require('../rooms');
 
 const router = express.Router();
 const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+const youtube = require('../lib/youtube');
 
 // ═══ V2/V3 — Rejoindre une soirée ════════════════════════════════
 
@@ -173,6 +175,12 @@ router.post('/me/tracks',
     if (!t.source || !t.sourceId || !t.title || !t.artist) {
       return res.status(400).json({ error: 'Morceau incomplet.' });
     }
+    // En mode YouTube, l'URL n'est pas une commodité pour retrouver le
+    // morceau plus tard : c'est ce qui sera joué. Accepter une autre
+    // source laisserait une manche sans rien à lire.
+    if (req.party.source_mode === 'youtube' && t.source !== 'youtube') {
+      return res.status(400).json({ error: 'Cette soirée n\'accepte que des liens YouTube.' });
+    }
     const result = await trackRepo.add(req.me.id, {
       source: t.source, sourceId: String(t.sourceId),
       title: String(t.title).slice(0, 300),
@@ -185,6 +193,64 @@ router.post('/me/tracks',
     });
     if (!result.ok) return res.status(result.quotaReached ? 409 : 400).json(result);
     res.status(201).json(result);
+  })
+);
+
+/**
+ * Corrige un morceau déjà déposé — titre, artiste, ou lien.
+ *
+ * En mode YouTube, titre et artiste sont saisis à la main : la faute de
+ * frappe est la règle, pas l'exception, et supprimer pour ré-ajouter
+ * ferait perdre son rang au morceau.
+ */
+/**
+ * Quitter le salon — libère le nom, ne détruit rien.
+ *
+ * Le jeton est invalidé : ce téléphone perd l'accès, et l'identité
+ * redevient disponible. Les morceaux et le score survivent, parce
+ * qu'ils appartiennent à la soirée autant qu'à la personne — les
+ * effacer priverait la playlist de manches déjà numérotées, et
+ * fausserait un classement en cours.
+ *
+ * L'hôte garde la main pour supprimer réellement s'il le faut.
+ */
+router.post('/me/leave', requireParticipant, wrap(async (req, res) => {
+  await participantRepo.release(req.me.id);
+  notify.partyChanged(req.party.code, req.party.state);
+  res.json({ ok: true });
+}));
+
+router.patch('/me/tracks/:trackId',
+  requireParticipant, requirePartyState('collecte'),
+  wrap(async (req, res) => {
+    const b = req.body || {};
+    const patch = {};
+
+    if (typeof b.title === 'string'  && b.title.trim())  patch.title  = b.title.trim().slice(0, 300);
+    if (typeof b.artist === 'string' && b.artist.trim()) patch.artist = b.artist.trim().slice(0, 300);
+
+    // Changer de lien, c'est changer de morceau : on le revérifie comme
+    // s'il était collé pour la première fois.
+    if (typeof b.url === 'string' && b.url.trim()) {
+      if (req.party.source_mode === 'youtube') {
+        const id = youtube.parseId(b.url);
+        if (!id) return res.status(422).json({ error: 'Ce lien n\'est pas une vidéo YouTube.' });
+        const probe = await youtube.probe(id);
+        if (!probe.ok) return res.status(422).json({ error: youtube.reasonText(probe.reason) });
+        patch.url = youtube.watchUrl(id);
+        patch.sourceId = id;
+      } else {
+        patch.url = b.url.trim().slice(0, 500);
+      }
+    }
+
+    if (!Object.keys(patch).length) {
+      return res.status(400).json({ error: 'Rien à modifier.' });
+    }
+
+    const result = await trackRepo.update(req.me.id, req.params.trackId, patch);
+    if (!result.ok) return res.status(result.closed ? 409 : 404).json(result);
+    res.json({ ok: true, tracks: await trackRepo.listByParticipant(req.me.id) });
   })
 );
 
@@ -242,6 +308,9 @@ function publicParty(p) {
     minTracks: p.min_tracks_per_person,
     maxTracks: p.max_tracks_per_person,
     selfRegistration: p.allow_self_registration,
+    // Détermine l'écran de collecte : recherche dans les catalogues, ou
+    // saisie d'URL.
+    sourceMode: p.source_mode || 'fichiers',
   };
 }
 

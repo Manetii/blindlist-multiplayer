@@ -166,6 +166,15 @@ body {
 /* Champ et bouton d'une même ligne : hauteur et rayon alignés, sinon
    le bouton flotte d'un ou deux pixels au-dessus du champ. */
 .search-row { display: flex; gap: .5rem; margin-bottom: 1rem; align-items: stretch; }
+
+/* Mode YouTube : plus de catalogue à interroger. La recherche, ses
+   filtres et sa liste de résultats n'ont rien à montrer, et les laisser
+   ferait chercher dans le vide. */
+body.mode-youtube .search-row,
+body.mode-youtube .source-filters,
+body.mode-youtube #results { display: none; }
+body.mode-youtube .paste-box { border-color: var(--accent-dim); }
+body.mode-youtube .paste-box summary { color: var(--text); font-weight: 600; }
 .search-row .btn { flex-shrink: 0; padding-block: 0; }
 .search-row .field { flex: 1; }
 
@@ -192,7 +201,10 @@ body {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .track-act {
-  flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%;
+  /* 2,75rem : la cible tactile recommandée. Une ligne de panier en
+     porte deux — corriger et retirer — et 34 px les rendaient difficiles
+     à distinguer du pouce. */
+  flex-shrink: 0; width: 2.75rem; height: 2.75rem; border-radius: 50%;
   border: 1px solid var(--border); background: none; color: var(--accent);
   font-size: 1.25rem; line-height: 1; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
@@ -201,6 +213,8 @@ body {
 .track-act:hover:not(:disabled) { border-color: var(--accent); background: rgba(0,229,255,.1); }
 .track-act.remove { color: var(--danger); }
 .track-act:disabled { opacity: .35; cursor: not-allowed; }
+/* Deux actions côte à côte : un peu moins d'écart entre elles. */
+.track .track-act + .track-act { margin-left: -.15rem; }
 .track.in-basket { border-color: var(--accent-dim); }
 
 .empty { color: var(--muted); font-size: .85rem; text-align: center; padding: 2.5rem 1rem; line-height: 1.6; }
@@ -339,15 +353,25 @@ body {
 @keyframes scoreBump { 0% { transform: scale(1); } 50% { transform: scale(1.4); } 100% { transform: scale(1); } }
 
 /* ─── Bannière de déconnexion ────────────────────────────────── */
+/*
+ * Bandeau de connexion — dans le flux.
+ *
+ * Il était en position fixe et devait donc connaître la hauteur exacte
+ * de la barre du haut pour se poser dessous. Cette hauteur varie avec
+ * la zone sûre du téléphone : il finissait à cheval sur la barre. En
+ * flux, il pousse le contenu et n'a plus rien à mesurer.
+ *
+ * Le repli se fait par max-height plutôt que par display, pour garder
+ * l'apparition glissée sans réserver de place quand il est absent.
+ */
 .connection-banner {
-  position: fixed; top: 0; left: 0; right: 0;
   background: var(--danger); color: #fff;
-  padding: 0.6rem 1rem; text-align: center;
-  font-size: 0.8rem; font-weight: 500; z-index: 200;
-  transform: translateY(-100%); transition: transform 0.3s ease;
+  text-align: center; font-size: 0.8rem; font-weight: 500;
   display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+  max-height: 0; padding: 0 1rem; overflow: hidden;
+  transition: max-height .3s ease, padding .3s ease;
 }
-.connection-banner.visible { transform: translateY(0); }
+.connection-banner.visible { max-height: 4rem; padding: 0.6rem 1rem; }
 .cb-dot { width: 8px; height: 8px; border-radius: 50%; background: #fff; animation: dotBlink .8s ease-in-out infinite; }
 
 /* Les écrans de jeu passent sous le header. */

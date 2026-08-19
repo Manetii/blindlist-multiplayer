@@ -1,391 +1,253 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta name="robots" content="noindex" />
-    <title>Blind Test — Soirée</title>
-    <link rel="stylesheet" href="/play/styles.css" />
-  </head>
-  <body>
-    <!-- ══════════ TOPBAR ══════════ -->
-    <header class="topbar">
-      <div class="topbar-left">
-        <a
-          href="/h"
-          class="topbar-btn"
-          id="back-console"
-          title="Retour à la console de préparation"
-          >←</a
-        >
-        <!-- Icônes seules : les quatre panneaux se retiennent en une
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Blind Test — Soirée</title>
+<link rel="stylesheet" href="/play/styles.css">
+</head>
+<body>
+
+<!-- ══════════ TOPBAR ══════════ -->
+<header class="topbar">
+  <div class="topbar-left">
+    <a href="/h" class="topbar-btn" id="back-console" title="Retour à la console de préparation">←</a>
+    <!-- Icônes seules : les quatre panneaux se retiennent en une
          soirée, et les libellés poussaient la marque hors du centre. -->
-        <button class="topbar-btn" id="tab-players" title="Panneau Joueurs (J)">
-          👥
-        </button>
-        <button
-          class="topbar-btn"
-          id="tab-playlist"
-          title="Panneau Playlist (P)"
-        >
-          🎵
-        </button>
-        <button
-          class="topbar-btn"
-          id="btn-mode-tv"
-          title="Mode TV : fermer tous les panneaux"
-        >
-          🖥
-        </button>
-        <button class="topbar-btn" id="btn-help" title="Raccourcis clavier (?)">
-          ?
-        </button>
-      </div>
-      <div class="topbar-brand">
-        <div class="mark"><span></span><span></span><span></span></div>
-        <div class="title">Blind<span>List</span></div>
-      </div>
-      <div class="topbar-right">
-        <div class="room-status" id="g-status">
-          <span class="rs-name" id="g-name">Soirée</span>
-          <!-- Le statut de lecture rejoint l'état du salon : c'est la même
+    <button class="topbar-btn" id="tab-players"  title="Panneau Joueurs (J)">👥</button>
+    <button class="topbar-btn" id="tab-playlist" title="Panneau Playlist (P)">🎵</button>
+    <button class="topbar-btn" id="btn-mode-tv"  title="Mode TV : fermer tous les panneaux">🖥</button>
+    <button class="topbar-btn" id="btn-help"     title="Raccourcis clavier (?)">?</button>
+  </div>
+  <div class="topbar-brand">
+    <div class="mark"><span></span><span></span><span></span></div>
+    <div class="title">Blind<span>Test</span></div>
+  </div>
+  <div class="topbar-right">
+    <div class="room-status" id="g-status">
+      <span class="rs-name" id="g-name">Soirée</span>
+      <!-- Le statut de lecture rejoint l'état du salon : c'est la même
            question — où en est la salle — et elle occupait une ligne au
            milieu du lecteur. -->
-          <span class="rs-state"
-            ><i class="rs-dot" id="conn-dot"></i
-            ><span class="rs-label" id="conn-label">…</span></span
-          >
-        </div>
+      <span class="rs-state"><i class="rs-dot" id="conn-dot"></i><span class="rs-label" id="conn-label">…</span></span>
+    </div>
+  </div>
+</header>
+
+<!-- ══════════ CONSOLE DE JEU ══════════ -->
+<section class="view active" data-view="game">
+  <div class="layout">
+
+    <!-- ─── Panneau gauche : joueurs ─── -->
+    <aside class="col-players">
+      <div class="panel-header">
+        <h2 class="panel-title">Joueurs <span class="panel-count" id="pl-count"></span><span class="panel-count" id="pl-kpi"></span></h2>
+        <button class="panel-action" id="close-players" title="Fermer">×</button>
       </div>
-    </header>
+      <div class="panel-body" id="pl-list"></div>
+      <div class="ready-strip" id="ready-strip"></div>
 
-    <!-- ══════════ CONSOLE DE JEU ══════════ -->
-    <section class="view active" data-view="game">
-      <div class="layout">
-        <!-- ─── Panneau gauche : joueurs ─── -->
-        <aside class="col-players">
-          <div class="panel-header">
-            <h2 class="panel-title">
-              Joueurs · <span class="playlist-count" id="pl-count"></span>
-            </h2>
-            <button class="panel-close" id="close-players" title="Fermer">
-              ×
-            </button>
-          </div>
-          <div class="panel-body" id="pl-list"></div>
-          <div class="ready-strip" id="ready-strip"></div>
-
-          <!-- Code et QR au pied du panneau joueurs.
+      <!-- Code et QR au pied du panneau joueurs.
            Ils n'ont plus rien à faire dans la barre du haut une fois la
            soirée lancée — mais ils redeviennent indispensables au pire
            moment : un téléphone qui décroche, un retardataire qui
            arrive. Les chercher est alors le geste qu'on fait en
            regardant qui manque, c'est-à-dire ici. -->
-          <details class="rejoin">
-            <summary>Rejoindre la soirée</summary>
-            <div class="rejoin-body">
-              <div class="room-code" id="g-code">····</div>
-              <div class="rejoin-qr" id="g-qr"></div>
+      <details class="rejoin">
+        <summary>Rejoindre la soirée</summary>
+        <div class="rejoin-body">
+          <div class="rejoin-code" id="g-code">····</div>
+          <div class="rejoin-qr" id="g-qr"></div>
+        </div>
+      </details>
+    </aside>
+
+    <!-- ─── Centre : lecteur ─── -->
+    <section class="col-main">
+      <div class="player-center">
+
+        <div class="vinyl-wrap">
+          <div class="vinyl-disc" id="vinyl">
+            <div class="vinyl-disc-grooves"></div>
+            <div class="vinyl-label">
+              <img id="vinyl-art" class="vinyl-label-art" src="" alt="">
+              <div class="vinyl-center-dot" id="vinyl-dot"></div>
             </div>
-          </details>
-        </aside>
+          </div>
+        </div>
 
-        <!-- ─── Centre : lecteur ─── -->
-        <section class="col-main">
-          <div class="player-center">
-            <div class="vinyl-wrap">
-              <div class="vinyl-disc" id="vinyl">
-                <div class="vinyl-disc-grooves"></div>
-                <div class="vinyl-label">
-                  <img id="vinyl-art" class="vinyl-label-art" src="" alt="" />
-                  <div class="vinyl-center-dot" id="vinyl-dot"></div>
-                </div>
-              </div>
+        <div class="now-playing">
+          <div class="np-status" id="np-status" style="opacity:0">
+            <div class="np-dot"></div>EN LECTURE
+          </div>
+          <div class="np-title"  id="np-title">—</div>
+          <div class="np-artist" id="np-artist">Charge un dossier pour commencer</div>
+        </div>
+
+        <div class="controls-wrap">
+          <div class="progress-area">
+            <div class="progress-bar" id="progress-bar">
+              <div class="progress-fill" id="progress-fill"></div>
             </div>
-
-            <div class="now-playing">
-              <div class="np-status" id="np-status" style="opacity: 0">
-                <div class="np-dot"></div>
-                EN LECTURE
-              </div>
-              <div class="np-title" id="np-title">—</div>
-              <div class="np-artist" id="np-artist">
-                Charge un dossier pour commencer
-              </div>
-            </div>
-
-            <div class="controls-wrap">
-              <div class="progress-area">
-                <div class="progress-bar" id="progress-bar">
-                  <div class="progress-fill" id="progress-fill"></div>
-                </div>
-                <div class="progress-times">
-                  <span id="time-cur">0:00</span><span id="time-tot">0:00</span>
-                </div>
-              </div>
-
-              <div class="key-moment-row">
-                <button
-                  class="btn-key-moment"
-                  id="btn-back10"
-                  title="Reculer 10 s (←)"
-                >
-                  − 10 s
-                </button>
-                <button
-                  class="btn-key-moment"
-                  id="btn-fwd10"
-                  title="Avancer 10 s (→)"
-                >
-                  + 10 s
-                </button>
-                <button
-                  class="btn-key-moment"
-                  id="btn-fwd30"
-                  title="Avancer 30 s"
-                >
-                  + 30 s
-                </button>
-                <button
-                  class="btn-toggle-indices"
-                  id="btn-indices"
-                  title="Afficher / masquer les indices"
-                >
-                  👁
-                </button>
-              </div>
-
-              <!-- UN compteur d'attente, pas deux : les votes et les
-               « prêts » ne sont jamais en cours en même temps, et deux
-               cases dont une éteinte en permanence occupaient le centre
-               de l'écran pour rien. -->
-              <div class="live-counters">
-                <div class="live-kpi" id="kpi-wait">
-                  <span class="lk-v">0/0</span
-                  ><span class="lk-k" id="kpi-wait-label">votes</span>
-                </div>
-                <div class="live-kpi idle" id="kpi-progress">
-                  <span class="lk-v" id="game-counter">0/0</span
-                  ><span class="lk-k">joués</span>
-                </div>
-              </div>
-              <div class="game-status" id="game-status"></div>
-
-              <div class="game-buttons">
-                <button
-                  class="btn-game-action btn-launch-round"
-                  id="btn-launch"
-                >
-                  ▶ Lancer le morceau suivant
-                </button>
-                <button
-                  class="btn-game-action btn-reveal-main hidden"
-                  id="btn-reveal"
-                >
-                  👁 Révéler la réponse
-                </button>
-                <button
-                  class="btn-pause-soiree"
-                  id="btn-pause"
-                  title="Pause / Lecture"
-                >
-                  ❚❚
-                </button>
-              </div>
-
-              <button class="btn-end-match" id="btn-end">
-                Terminer la partie
-              </button>
+            <div class="progress-times">
+              <span id="time-cur">0:00</span><span id="time-tot">0:00</span>
             </div>
           </div>
 
-          <!-- Posé en coin : réglé une fois en début de soirée, il n'a rien
+          <div class="key-moment-row">
+            <button class="btn-key-moment" id="btn-back10" title="Reculer 10 s (←)">− 10 s</button>
+            <button class="btn-key-moment" id="btn-fwd10"  title="Avancer 10 s (→)">+ 10 s</button>
+            <button class="btn-key-moment" id="btn-fwd30"  title="Avancer 30 s">+ 30 s</button>
+            <button class="btn-toggle-indices" id="btn-indices" title="Afficher / masquer les indices">👁</button>
+          </div>
+
+          <!-- Les compteurs sont descendus dans leurs panneaux.
+               « 3/5 votes » est un état de la TABLE, pas de la lecture :
+               le mettre à côté du vinyle revenait à parler des gens à
+               l'endroit où l'on regarde la musique. Dans le panneau
+               joueurs, l'information devient nominative — qui a voté,
+               qui est prêt — et le compteur n'a plus lieu d'être. -->
+          <div class="game-status" id="game-status"></div>
+
+          <div class="game-buttons">
+            <button class="btn-game-action btn-launch-round" id="btn-launch">
+              ▶ Lancer le morceau suivant
+            </button>
+            <button class="btn-game-action btn-reveal-main hidden" id="btn-reveal">
+              👁 Révéler la réponse
+            </button>
+            <button class="btn-pause-soiree" id="btn-pause" title="Pause / Lecture">❚❚</button>
+          </div>
+
+          <button class="btn-end-match" id="btn-end">Terminer la partie</button>
+        </div>
+      </div>
+
+      <!-- Posé en coin : réglé une fois en début de soirée, il n'a rien
            à faire dans l'axe que l'on regarde entre deux manches. -->
-          <div class="volume-corner">
-            <span class="vol-icon">🔊</span>
-            <input
-              type="range"
-              class="volume-slider"
-              id="vol-slider"
-              min="0"
-              max="100"
-              value="85"
-            />
-            <span class="vol-val" id="vol-val">85%</span>
-          </div>
-        </section>
+      <div class="volume-corner">
+        <span class="vol-icon">🔊</span>
+        <input type="range" class="volume-slider" id="vol-slider" min="0" max="100" value="85">
+        <span class="vol-val" id="vol-val">85%</span>
+      </div>
+    </section>
 
-        <!-- ─── Panneau droit : playlist + votes ─── -->
-        <section class="col-playlist">
-          <div class="panel-header">
-            <h2 class="panel-title">
-              Playlist · <span class="playlist-count" id="tr-count"></span>
-            </h2>
-            <button class="panel-close" id="close-playlist" title="Fermer">
-              ×
-            </button>
-          </div>
+    <!-- ─── Panneau droit : playlist + votes ─── -->
+    <section class="col-playlist">
+      <div class="panel-header">
+        <h2 class="panel-title">Playlist <span class="panel-count" id="tr-count"></span><span class="panel-count" id="game-counter"></span></h2>
+        <button class="panel-action" id="close-playlist" title="Fermer">×</button>
+      </div>
 
-          <div class="playlist-tools-banner">
-            <div class="playlist-tools-row">
-              <label for="tr-sort">Trier</label>
-              <select class="inp-mini" id="tr-sort">
-                <option value="no">Par numéro</option>
-                <option value="artist">Par artiste</option>
-                <option value="title">Par titre</option>
-                <option value="player">Par joueur</option>
-                <option value="played">Non joués d'abord</option>
-              </select>
-            </div>
-            <label
-              class="anonymize-switch"
-              title="Masque à qui appartient chaque morceau — à activer avant que la salle regarde l'écran"
-            >
-              <input type="checkbox" id="tr-anon" checked />
-              <span>Anonymiser</span>
-            </label>
-          </div>
+      <div class="playlist-tools-banner">
+        <div class="playlist-tools-row">
+          <label for="tr-sort">Trier</label>
+          <select class="inp-mini" id="tr-sort">
+            <option value="no">Par numéro</option>
+            <option value="artist">Par artiste</option>
+            <option value="title">Par titre</option>
+            <option value="player">Par joueur</option>
+            <option value="played">Non joués d'abord</option>
+          </select>
+        </div>
+        <label class="anonymize-switch" title="Masque à qui appartient chaque morceau — à activer avant que la salle regarde l'écran">
+          <input type="checkbox" id="tr-anon" checked>
+          <span>Anonymiser</span>
+        </label>
+      </div>
 
-          <div class="panel-body" id="tr-list"></div>
-          <div class="playlist-footer">
-            <input
-              type="file"
-              id="g-folder-input"
-              webkitdirectory
-              directory
-              multiple
-              style="display: none"
-            />
-            <button class="btn-reset-played" id="g-folder-btn">
-              📁 Charger le dossier des morceaux
-            </button>
-            <!-- Séparé du chargement de dossier par un trait : son libellé
+      <div class="panel-body" id="tr-list"></div>
+      <div class="playlist-footer">
+        <input type="file" id="g-folder-input" webkitdirectory directory multiple style="display:none">
+        <!-- En mode YouTube, ce bouton rouvre la fenêtre de lecture au
+             lieu de charger un dossier : c'est le même besoin — avoir de
+             quoi jouer — au même endroit. -->
+        <button class="btn-reset-played hidden" id="yt-reopen">🔊 Rouvrir la fenêtre de lecture</button>
+        <button class="btn-reset-played" id="g-folder-btn">📁 Charger le dossier des morceaux</button>
+        <!-- Séparé du chargement de dossier par un trait : son libellé
              promettait des morceaux, il efface aussi les scores. -->
-            <button
-              class="btn-reset-played danger-action"
-              id="btn-reset-played"
-              title="Remet tous les morceaux en jeu ET remet les scores à zéro"
-            >
-              ↺ Rejouer toute la playlist (scores à zéro)
-            </button>
-            <div id="g-folder-report" class="folder-report"></div>
-          </div>
-        </section>
+        <button class="btn-reset-played danger-action" id="btn-reset-played"
+                title="Remet tous les morceaux en jeu ET remet les scores à zéro">↺ Rejouer toute la playlist (scores à zéro)</button>
+        <div id="g-folder-report" class="folder-report"></div>
       </div>
     </section>
+  </div>
+</section>
 
-    <!-- ══════════ REVEAL OVERLAY ══════════ -->
-    <div class="overlay" id="overlay">
-      <div class="reveal-card">
-        <div class="reveal-card-inner">
-          <div class="reveal-col-left">
-            <div class="reveal-art-zone" id="reveal-art-zone">
-              <div class="reveal-art-placeholder" id="reveal-art-placeholder">
-                🎵
-              </div>
-              <img class="reveal-art-img" id="reveal-art" alt="" />
-            </div>
-            <div class="reveal-info">
-              <div class="reveal-label">Morceau</div>
-              <div class="reveal-title" id="rc-title">—</div>
-              <div class="reveal-artist" id="rc-artist">—</div>
-              <div class="reveal-divider"></div>
-              <div class="reveal-player-row">
-                <div class="reveal-player-dot" id="rc-dot"></div>
-                <div>
-                  <div class="reveal-player-label">Choisi par</div>
-                  <div class="reveal-player-name" id="rc-player">—</div>
-                </div>
-              </div>
+<!-- ══════════ REVEAL OVERLAY ══════════ -->
+<div class="overlay" id="overlay">
+  <div class="reveal-card">
+    <div class="reveal-card-inner">
+      <div class="reveal-col-left">
+        <div class="reveal-art-zone" id="reveal-art-zone">
+          <div class="reveal-art-placeholder" id="reveal-art-placeholder">🎵</div>
+          <img class="reveal-art-img" id="reveal-art" alt="">
+        </div>
+        <div class="reveal-info">
+          <div class="reveal-label">Morceau</div>
+          <div class="reveal-title"  id="rc-title">—</div>
+          <div class="reveal-artist" id="rc-artist">—</div>
+          <div class="reveal-divider"></div>
+          <div class="reveal-player-row">
+            <div class="reveal-player-dot" id="rc-dot"></div>
+            <div>
+              <div class="reveal-player-label">Choisi par</div>
+              <div class="reveal-player-name" id="rc-player">—</div>
             </div>
           </div>
-          <div class="reveal-col-right">
-            <div class="scoring-panel" id="scoring-panel"></div>
-            <div class="reveal-footer">
-              <button class="btn-modal" id="btn-cancel-scores">Annuler</button>
-              <button class="btn-modal primary" id="btn-validate-scores">
-                ✓ Valider les points
-              </button>
-            </div>
-          </div>
+        </div>
+      </div>
+      <div class="reveal-col-right">
+        <div class="scoring-panel" id="scoring-panel"></div>
+        <div class="reveal-footer">
+          <button class="btn-modal" id="btn-cancel-scores">Annuler</button>
+          <button class="btn-modal primary" id="btn-validate-scores">✓ Valider les points</button>
         </div>
       </div>
     </div>
+  </div>
+</div>
 
-    <!-- ══════════ PODIUM ══════════ -->
-    <section class="view" data-view="podium">
-      <div class="folder-box">
-        <h2 class="podium-title">Fin de partie</h2>
-        <div id="pod-list" class="podium-list"></div>
-        <div
-          class="btn-row"
-          style="
-            flex-direction: column;
-            gap: 0.6rem;
-            width: 100%;
-            max-width: 340px;
-            margin-top: 1.5rem;
-          "
-        >
-          <button class="btn-game-action btn-launch-round" id="pod-back">
-            Retour au lecteur
-          </button>
-          <button class="btn-end-match" id="pod-close">Fermer le salon</button>
-        </div>
-      </div>
-    </section>
-
-    <div class="help-overlay" id="help-overlay">
-      <div class="help-card">
-        <h3>Raccourcis clavier</h3>
-        <div class="help-row">
-          <span class="help-key">Espace</span><span>Lecture / pause</span>
-        </div>
-        <div class="help-row">
-          <span class="help-key">Entrée</span
-          ><span>Lancer un morceau ou révéler</span>
-        </div>
-        <div class="help-row">
-          <span class="help-key">← →</span
-          ><span>Reculer / avancer de 10 s</span>
-        </div>
-        <div class="help-row">
-          <span class="help-key">N</span><span>Lancer le morceau suivant</span>
-        </div>
-        <div class="help-row">
-          <span class="help-key">R</span><span>Révéler la réponse</span>
-        </div>
-        <div class="help-row">
-          <span class="help-key">H</span
-          ><span>Cacher / afficher les indices</span>
-        </div>
-        <div class="help-row">
-          <span class="help-key">A</span><span>Anonymiser la playlist</span>
-        </div>
-        <div class="help-row">
-          <span class="help-key">T</span><span>Mode TV</span>
-        </div>
-        <div class="help-row">
-          <span class="help-key">J</span><span>Panneau Joueurs</span>
-        </div>
-        <div class="help-row">
-          <span class="help-key">P</span><span>Panneau Playlist</span>
-        </div>
-        <div class="help-row">
-          <span class="help-key">Échap</span><span>Fermer</span>
-        </div>
-      </div>
+<!-- ══════════ PODIUM ══════════ -->
+<section class="view" data-view="podium">
+  <div class="folder-box">
+    <h2 class="podium-title">Fin de partie</h2>
+    <div id="pod-list" class="podium-list"></div>
+    <div class="btn-row" style="flex-direction:column;gap:.6rem;width:100%;max-width:340px;margin-top:1.5rem">
+      <button class="btn-game-action btn-launch-round" id="pod-back">Retour au lecteur</button>
+      <button class="btn-end-match" id="pod-close">Fermer le salon</button>
     </div>
+  </div>
+</section>
 
-    <canvas id="confetti-canvas"></canvas>
-    <div class="toast" id="toast"></div>
+<div class="help-overlay" id="help-overlay">
+  <div class="help-card">
+    <h3>Raccourcis clavier</h3>
+    <div class="help-row"><span class="help-key">Espace</span><span>Lecture / pause</span></div>
+    <div class="help-row"><span class="help-key">Entrée</span><span>Lancer un morceau ou révéler</span></div>
+    <div class="help-row"><span class="help-key">← →</span><span>Reculer / avancer de 10 s</span></div>
+    <div class="help-row"><span class="help-key">N</span><span>Lancer le morceau suivant</span></div>
+    <div class="help-row"><span class="help-key">R</span><span>Révéler la réponse</span></div>
+    <div class="help-row"><span class="help-key">H</span><span>Cacher / afficher les indices</span></div>
+    <div class="help-row"><span class="help-key">A</span><span>Anonymiser la playlist</span></div>
+    <div class="help-row"><span class="help-key">T</span><span>Mode TV</span></div>
+    <div class="help-row"><span class="help-key">J</span><span>Panneau Joueurs</span></div>
+    <div class="help-row"><span class="help-key">P</span><span>Panneau Playlist</span></div>
+    <div class="help-row"><span class="help-key">Échap</span><span>Fermer</span></div>
+  </div>
+</div>
 
-    <script src="/shared/room-status.js"></script>
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="/shared/events.js"></script>
-    <script src="/shared/folder-store.js"></script>
-    <script src="/play/audio.js"></script>
-    <script src="/play/scoring.js"></script>
-    <script src="/play/app.js"></script>
-  </body>
+<canvas id="confetti-canvas"></canvas>
+<div class="toast" id="toast"></div>
+
+<script src="/shared/room-status.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/shared/events.js"></script>
+<script src="/shared/folder-store.js"></script>
+<script src="/play/audio.js"></script>
+<script src="/play/youtube-engine.js"></script>
+<script src="/play/scoring.js"></script>
+<script src="/play/app.js"></script>
+</body>
 </html>

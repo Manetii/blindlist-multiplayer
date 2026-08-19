@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Lecteur — BlindTest</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="stylesheet" href="/shared/base.css">
+<style>
+  /*
+   * Cette fenêtre ne contient QUE le lecteur.
+   *
+   * Elle est faite pour être posée hors du champ de la salle — sur un
+   * second écran, ou derrière la fenêtre principale. Le lecteur y est
+   * entier, visible et à sa taille : rien n'est masqué ni recouvert.
+   */
+  body { margin: 0; display: flex; flex-direction: column; height: 100dvh; }
+  .hint {
+    padding: .5rem .75rem; font-size: var(--t-micro); color: var(--muted);
+    border-bottom: 1px solid var(--border); text-align: center;
+  }
+  .frame { flex: 1; min-height: 0; position: relative; }
+  #yt { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .consent {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 1rem; padding: 1.5rem;
+    text-align: center; background: var(--surface);
+  }
+  .consent p { font-size: var(--t-small); color: var(--muted); max-width: 28rem; line-height: 1.5; }
+</style>
+</head>
+<body>
+  <div class="hint">Fenêtre de lecture — garde-la hors de vue de la salle.</div>
+  <div class="frame">
+    <div id="yt"></div>
+    <!--
+      Écran de consentement.
+
+      youtube-nocookie ne dépose rien tant que la lecture n'a pas
+      commencé ; le seul chargement de l'API en pose. On attend donc un
+      accord explicite avant d'aller chercher quoi que ce soit chez
+      Google — et comme il n'y a qu'un point de chargement dans tout le
+      projet, un seul écran suffit.
+    -->
+    <div class="consent" id="consent">
+      <h2 style="font-family:'Bebas Neue',sans-serif;font-size:1.6rem">Lecture via YouTube</h2>
+      <p>Cette soirée lit ses morceaux depuis YouTube. Démarrer chargera le
+         lecteur de Google, qui pourra déposer des cookies sur ce navigateur.
+         Rien n'est chargé tant que tu n'as pas accepté, et seule cette
+         fenêtre est concernée — les téléphones des joueurs ne chargent rien.</p>
+      <button class="btn" id="consent-ok">Charger le lecteur</button>
+    </div>
+  </div>
+
+<script>
+/*
+ * Pont entre la console de jeu et l'API IFrame.
+ *
+ * Tout passe par postMessage : la fenêtre parente est de même origine,
+ * mais s'en tenir aux messages garde une frontière nette et rend la
+ * fenêtre remplaçable sans toucher au moteur.
+ */
+(() => {
+  const ORIGIN = location.origin;
+  let player = null, ready = false;
+  let fadeTimer = null;
+
+  /*
+   * Volume VOULU, distinct du volume courant.
+   *
+   * Les fondus font descendre le volume réel à zéro ; sans mémoire de
+   * la valeur visée, un enchaînement interrompu au mauvais moment
+   * laisse le lecteur muet sans que rien ne le signale. C'est
+   * exactement ce qui se produisait au passage au morceau suivant.
+   */
+  let targetVolume = 85;
+
+  document.getElementById('consent-ok').addEventListener('click', loadApi);
+
+  function loadApi() {
+    document.getElementById('consent').remove();
+    const s = document.createElement('script');
+    s.src = 'https://www.youtube.com/iframe_api';
+    document.head.appendChild(s);
+  }
+
+  window.onYouTubeIframeAPIReady = () => {
+    player = new YT.Player('yt', {
+      host: 'https://www.youtube-nocookie.com',
+      playerVars: { rel: 0, modestbranding: 1, playsinline: 1, origin: ORIGIN },
+      events: {
+        onReady: () => {
+          ready = true;
+          post({ type: 'yt-ready' });
+          setInterval(pushState, 250);
+        },
+        onStateChange: (e) => {
+          if (e.data === YT.PlayerState.ENDED) post({ type: 'yt-ended' });
+          pushState();
+        },
+      },
+    });
+  };
+
+  function post(msg) { if (window.opener) window.opener.postMessage(msg, ORIGIN); }
+
+  function pushState() {
+    if (!ready) return;
+    ensureAudible();
+    post({
+      type: 'yt-state',
+      state: {
+        playing:  player.getPlayerState() === YT.PlayerState.PLAYING,
+        current:  player.getCurrentTime() || 0,
+        duration: player.getDuration() || 0,
+      },
+    });
+  }
+
+  /**
+   * Fondu de volume par paliers.
+   *
+   * L'API n'expose pas de courbe : on interpole nous-mêmes. Vingt
+   * paliers suffisent à rendre la transition inaudible.
+   */
+  function fadeTo(target, ms, then) {
+    clearInterval(fadeTimer);
+    const from = player.getVolume();
+    const steps = Math.max(1, Math.round(ms / 20));
+    let i = 0;
+    fadeTimer = setInterval(() => {
+      i++;
+      player.setVolume(Math.round(from + (target - from) * (i / steps)));
+      if (i < steps) return;
+      clearInterval(fadeTimer);
+      // On POSE la valeur d'arrivée plutôt que de la laisser au dernier
+      // arrondi : quinze multiplications successives finissent à 84 ou
+      // 86, et l'écart se cumule d'une manche à l'autre.
+      player.setVolume(target);
+      if (target > 0) player.unMute();
+      if (then) then();
+    }, 20);
+  }
+
+  /**
+   * Rétablit un lecteur devenu muet.
+   *
+   * Le navigateur coupe le son de lui-même quand il estime qu'une
+   * lecture démarre sans geste de l'utilisateur — ce qui est exactement
+   * notre cas dès la deuxième manche, puisque c'est la console qui
+   * enchaîne. Rien ne le signale : la vidéo tourne, la salle n'entend
+   * rien. On vérifie donc, et on corrige.
+   */
+  function ensureAudible() {
+    if (!ready || targetVolume <= 0) return;
+    if (fadeTimer) return;                 // un fondu est en cours, il sait où il va
+    if (player.isMuted()) player.unMute();
+    if (player.getVolume() === 0) player.setVolume(targetVolume);
+  }
+
+  window.addEventListener('message', (e) => {
+    if (e.origin !== ORIGIN || !e.data || e.data.type !== 'yt-cmd' || !ready) return;
+    const { cmd, arg } = e.data;
+
+    if (cmd === 'load') {
+      targetVolume = arg.volume;
+      // unMute AVANT le chargement : le navigateur peut avoir coupé le
+      // son à la manche précédente pour autoriser une lecture sans
+      // geste, et setVolume seul ne rétablit rien sur un lecteur muet.
+      player.unMute();
+      player.loadVideoById({ videoId: arg.id, startSeconds: arg.startSeconds || 0 });
+      // Monter depuis zéro évite l'attaque brutale au démarrage, comme
+      // le fondu d'entrée du moteur de fichiers.
+      player.setVolume(0);
+      fadeTo(arg.volume, 300);
+    }
+    else if (cmd === 'play')  { player.playVideo(); ensureAudible(); }
+    else if (cmd === 'pause') player.pauseVideo();
+    else if (cmd === 'stop')  {
+      player.stopVideo();
+      // Le fondu de sortie a laissé le volume à zéro. Le rétablir tout
+      // de suite évite qu'une lecture déclenchée par un autre chemin
+      // parte muette.
+      player.setVolume(targetVolume);
+    }
+    else if (cmd === 'setVolume') { targetVolume = arg; player.unMute(); player.setVolume(arg); }
+    else if (cmd === 'fadeTo') fadeTo(arg.target, arg.fadeMs);
+    else if (cmd === 'fadeSeek') {
+      const to = Math.max(0, player.getCurrentTime() + arg.delta);
+      fadeTo(0, arg.fadeMs, () => {
+        player.seekTo(to, true);
+        fadeTo(arg.volume, arg.fadeMs);
+      });
+    }
+  });
+
+  // Prévenir la console si l'hôte ferme cette fenêtre par mégarde.
+  window.addEventListener('beforeunload', () => post({ type: 'yt-closed' }));
+})();
+</script>
+</body>
+</html>

@@ -1,364 +1,323 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta name="robots" content="noindex" />
-    <title>Blind Test — Console</title>
-    <link rel="stylesheet" href="/shared/base.css" />
-    <link rel="stylesheet" href="/host/styles.css" />
-  </head>
-  <body>
-    <!-- ═══ H1 — Créer ou choisir une soirée ═══════════════════════ -->
-    <section class="view" data-view="pick">
-      <header class="topbar">
-        <div class="topbar-left"></div>
-        <div class="topbar-brand">
-          <div class="mark"><span></span><span></span><span></span></div>
-          <div class="title">Blind<span>List</span></div>
-        </div>
-        <div class="topbar-right"></div>
-      </header>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Blind Test — Console</title>
+<link rel="stylesheet" href="/shared/base.css">
+<link rel="stylesheet" href="/host/styles.css">
+</head>
+<body>
 
-      <div class="wrap narrow">
-        <div id="my-parties" class="hidden">
-          <div class="eyebrow">Mes soirées</div>
-          <div
-            id="my-parties-list"
-            class="stack"
-            style="margin: 0.6rem 0 2rem"
-          ></div>
-        </div>
+<!-- ═══ H1 — Créer ou choisir une soirée ═══════════════════════ -->
+<section class="view" data-view="pick">
+  <header class="topbar">
+    <div class="topbar-left"></div>
+    <div class="topbar-brand">
+      <div class="mark"><span></span><span></span><span></span></div>
+      <div class="title">Blind<span>Test</span></div>
+    </div>
+    <div class="topbar-right"></div>
+  </header>
 
-        <div class="card">
-          <h2>Nouvelle soirée</h2>
-          <p class="muted small" style="margin: 0.35rem 0 1rem">
-            Tu obtiendras un code à partager. Chacun saisit son nom en arrivant,
-            puis propose ses morceaux. Tout le reste se règle ensuite depuis la
-            console.
-          </p>
+  <div class="wrap narrow">
+    <div id="my-parties" class="hidden">
+      <div class="eyebrow">Mes soirées</div>
+      <div id="my-parties-list" class="stack" style="margin:.6rem 0 2rem"></div>
+    </div>
 
-          <label class="lbl" for="np-name">Nom de la soirée</label>
-          <input
-            class="field"
-            id="np-name"
-            placeholder="Soirée chez Marc"
-            maxlength="60"
-          />
+    <div class="card">
+      <h2>Nouvelle soirée</h2>
+      <p class="muted small" style="margin:.35rem 0 1rem">
+        Tu obtiendras un code à partager. Chacun saisit son nom en arrivant, puis
+        propose ses morceaux. Tout le reste se règle ensuite depuis la console.
+      </p>
 
-          <p class="error" id="np-error"></p>
-          <button class="btn full" id="np-create" style="margin-top: 0.9rem">
-            Créer la soirée
-          </button>
+      <label class="lbl" for="np-name">Nom de la soirée</label>
+      <input class="field" id="np-name" placeholder="Soirée chez Marc" maxlength="60">
 
-          <div class="advanced" style="margin-top: 1rem; text-align: center">
-            <input
-              type="file"
-              id="import-input"
-              accept="application/json,.json"
-              style="display: none"
-            />
-            <button class="btn ghost sm" id="import-btn">
-              Importer une sauvegarde
-            </button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ═══ H0 — Console d'une soirée ══════════════════════════════ -->
-    <section class="view" data-view="console">
-      <header class="topbar">
-        <div class="topbar-left">
-          <a href="/h" class="topbar-btn" title="Retour à l'accueil">←</a>
-        </div>
-        <div class="topbar-brand">
-          <div class="mark"><span></span><span></span><span></span></div>
-          <div class="title">Blind<span>List</span></div>
-        </div>
-        <div class="topbar-right">
-          <div class="room-status" id="c-status">
-            <span class="rs-name">Soirée</span>
-            <span class="rs-state"
-              ><i class="rs-dot"></i><span class="rs-label">—</span></span
-            >
-          </div>
-        </div>
-      </header>
-
-      <div class="wrap">
-        <!-- Partage -->
-        <div class="card share">
+      <!-- Choisi ici, et figé dès le premier morceau proposé : un panier
+           constitué dans un mode n'a pas d'équivalent dans l'autre. -->
+      <div class="lbl" style="margin-top:1.25rem">Comment alimenter la playlist</div>
+      <div class="mode-choice">
+        <label class="mode-card">
+          <input type="radio" name="np-mode" value="fichiers" checked>
           <div>
-            <div class="eyebrow">Code de la soirée</div>
-            <div class="code" id="c-code">····</div>
-            <!-- L'URL en toutes lettres occupait trois lignes pour une
-             information que personne ne recopie à la main : le code
-             au-dessus et le QR à côté suffisent. -->
-            <div class="share-actions">
-              <button class="btn sm" id="c-invite">Inviter</button>
-            </div>
-            <div id="c-net" class="hidden" style="margin-top: 0.75rem"></div>
+            <b>Fichiers audio</b>
+            <span>Chacun cherche ses morceaux dans les catalogues. Tu récupères
+            les fichiers et tu les apparies. La soirée tourne ensuite hors ligne :
+            une fois le dossier chargé, plus rien ne peut lâcher.</span>
           </div>
-          <div class="qr" id="c-qr"></div>
-        </div>
-
-        <!-- Étapes : cliquables pour naviguer sans faire défiler -->
-        <nav class="steps" id="c-steps"></nav>
-        <div class="step-nav">
-          <button class="btn ghost sm" id="step-prev">← Précédent</button>
-          <span class="step-title" id="step-title"></span>
-          <button class="btn ghost sm" id="step-next">Suivant →</button>
-        </div>
-
-        <!-- ─────────── ÉTAPE 0 — COLLECTE ─────────── -->
-
-        <!-- Participants : liste seule. Créer les pseudos à leur place n'a
-         plus d'objet — chacun saisit le sien, et les doublons sont
-         arbitrés à l'inscription. -->
-        <div class="card step-block" data-step="0" id="s-people">
-          <div class="card-head">
-            <h2>Participants</h2>
-            <span class="count" id="p-count">0</span>
+        </label>
+        <label class="mode-card">
+          <input type="radio" name="np-mode" value="youtube">
+          <div>
+            <b>Liens YouTube</b>
+            <span>Chacun colle une URL et saisit titre et artiste. Rien à
+            télécharger, rien à apparier — mais il faut une connexion solide
+            pendant toute la soirée.</span>
           </div>
-          <p class="error" id="p-error"></p>
-          <div id="p-list" class="stack"></div>
-        </div>
+        </label>
+      </div>
 
-        <!-- Doublons : avant le verrouillage, puisque c'est lui qui fige la
+      <p class="error" id="np-error"></p>
+      <button class="btn full" id="np-create" style="margin-top:.9rem">Créer la soirée</button>
+
+      <div class="advanced" style="margin-top:1rem;text-align:center">
+        <input type="file" id="import-input" accept="application/json,.json" style="display:none">
+        <button class="btn ghost sm" id="import-btn">Importer une sauvegarde</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ H0 — Console d'une soirée ══════════════════════════════ -->
+<section class="view" data-view="console">
+  <header class="topbar">
+    <div class="topbar-left">
+      <a href="/h" class="topbar-btn" title="Retour à l'accueil">←</a>
+    </div>
+    <div class="topbar-brand">
+      <div class="mark"><span></span><span></span><span></span></div>
+      <div class="title">Blind<span>Test</span></div>
+    </div>
+    <div class="topbar-right">
+      <div class="room-status" id="c-status">
+        <span class="rs-name">Soirée</span>
+        <span class="rs-state"><i class="rs-dot"></i><span class="rs-label">—</span></span>
+      </div>
+    </div>
+  </header>
+
+  <div class="console-layout">
+
+    <!-- ═══ Panneau permanent : qui est là, et où il en est ═══
+         Même emplacement et même largeur que dans le lecteur : c'est la
+         même question posée à deux moments de la soirée, et seule
+         l'unité de mesure change — des morceaux pendant la préparation,
+         des votes pendant la partie.
+         Le bloc de partage y descend : on le cherche en regardant qui
+         manque à l'appel, c'est-à-dire ici. -->
+    <aside class="col-people">
+      <div class="panel-header">
+        <h2 class="panel-title">Joueurs <span class="panel-count" id="p-count">0</span></h2>
+      </div>
+      <p class="error" id="p-error"></p>
+      <div class="panel-body" id="p-list"></div>
+
+      <!-- Ouvert d'office ici : pendant la préparation, inviter EST le
+           geste du moment. Replié dans le lecteur, où le code ne sert
+           plus qu'en cas de pépin. -->
+      <details class="rejoin" open>
+        <summary>Rejoindre la soirée</summary>
+        <div class="rejoin-body">
+          <div class="rejoin-code" id="c-code">····</div>
+          <button class="btn sm full" id="c-invite" style="margin-top:.5rem">Inviter</button>
+          <div id="c-net" class="hidden" style="margin-top:.75rem"></div>
+          <div class="rejoin-qr" id="c-qr"></div>
+        </div>
+      </details>
+    </aside>
+
+    <div class="wrap">
+
+    <!-- Étapes : cliquables pour naviguer sans faire défiler -->
+    <nav class="steps" id="c-steps"></nav>
+    <div class="step-nav">
+      <button class="btn ghost sm" id="step-prev">← Précédent</button>
+      <span class="step-title" id="step-title"></span>
+      <button class="btn ghost sm" id="step-next">Suivant →</button>
+    </div>
+
+    <!-- ─────────── ÉTAPE 0 — COLLECTE ─────────── -->
+
+    <!-- Doublons : avant le verrouillage, puisque c'est lui qui fige la
          playlist. -->
-        <div class="card step-block" data-step="0" id="s-dupes">
-          <div class="card-head"><h2>Doublons à trancher</h2></div>
-          <p class="muted small">
-            Deux personnes ont proposé le même morceau. Le jeu ne peut avoir
-            qu'une bonne réponse par manche : garde-en un seul.
-          </p>
-          <div id="dupe-list" class="stack" style="margin-top: 0.9rem"></div>
-        </div>
+    <div class="card step-block" data-step="0" id="s-dupes">
+      <div class="card-head"><h2>Doublons à trancher</h2></div>
+      <p class="muted small">
+        Deux personnes ont proposé le même morceau. Le jeu ne peut avoir qu'une
+        bonne réponse par manche : garde-en un seul.
+      </p>
+      <div id="dupe-list" class="stack" style="margin-top:.9rem"></div>
+    </div>
 
-        <!-- Quota, avancement et verrouillage : UNE seule carte. Ces trois
+    <!-- Quota, avancement et verrouillage : UNE seule carte. Ces trois
          informations répondent à une même question — puis-je fermer la
          collecte ? — et les séparer obligeait à faire défiler pour y
          répondre. -->
-        <div class="card step-block" data-step="0" id="s-collect">
-          <div class="card-head"><h2>Collecte</h2></div>
+    <div class="card step-block" data-step="0" id="s-collect">
+      <div class="card-head"><h2>Collecte</h2></div>
 
-          <div class="row2">
-            <div>
-              <label class="lbl" for="q-min">Minimum par joueur</label>
-              <input class="field" id="q-min" type="number" min="1" max="50" />
-            </div>
-            <div>
-              <label class="lbl" for="q-max">Maximum par joueur</label>
-              <input class="field" id="q-max" type="number" min="1" max="50" />
-              <p
-                class="muted small"
-                id="q-floor"
-                style="margin-top: 0.3rem"
-              ></p>
-            </div>
-          </div>
-          <p class="muted small" style="margin-top: 0.5rem">
-            Le minimum pousse chacun à se dévoiler, le maximum évite qu'une
-            seule personne remplisse la playlist.
-          </p>
-          <!-- L'estimation est la seule information qui permette de choisir un
-           quota en connaissance de cause : 6 × 6, ce sont 36 fichiers à
-           réunir et une soirée de trois heures. -->
-          <div
-            class="banner info"
-            id="q-estimate"
-            style="margin-top: 0.75rem"
-          ></div>
+      <div class="banner info" id="c-mode" style="margin-bottom:1rem"></div>
 
-          <div class="card-head" style="margin-top: 1.5rem">
-            <h2>Où en sont-ils</h2>
-            <!-- Ici, et pas dans la barre du haut : c'est l'avancement des
-             paniers qu'on rafraîchit, et lui seul bouge tout seul. -->
-            <span
-              class="muted small"
-              id="c-refreshed"
-              style="margin-left: auto"
-            ></span>
-            <button
-              class="btn ghost sm"
-              id="btn-refresh"
-              title="Actualiser joueurs et morceaux"
-            >
-              ↻ Actualiser
-            </button>
-          </div>
-          <div id="prog-list" class="stack"></div>
-
-          <div class="card-head" style="margin-top: 1.5rem">
-            <h2>Verrouiller</h2>
-          </div>
-          <p class="muted small" id="lock-hint"></p>
-          <div class="btn-row" style="margin-top: 0.9rem">
-            <button class="btn" id="lock-btn">Verrouiller et numéroter</button>
-            <button class="btn ghost" id="unlock-btn">
-              Rouvrir la collecte
-            </button>
-          </div>
+      <div class="row2">
+        <div>
+          <label class="lbl" for="q-min">Minimum par joueur</label>
+          <input class="field" id="q-min" type="number" min="1" max="50">
         </div>
-
-        <!-- ─────────── ÉTAPE 1 — FICHIERS ─────────── -->
-
-        <div class="card step-block" data-step="1" id="s-files">
-          <div class="card-head"><h2>Fichiers</h2></div>
-          <p class="muted small">
-            Télécharge les morceaux avec l'outil de ton choix —
-            <b>aucun renommage nécessaire</b>. Désigne ensuite le dossier : la
-            console lit les tags de chaque fichier, mesure sa durée et propose
-            un appariement que tu valides. Rien ne quitte ton poste.
-          </p>
-          <p class="muted small" style="margin-top: 0.5rem">
-            Une playlist incomplète ne bloque pas la soirée : les morceaux sans
-            fichier sont simplement écartés, et tu peux revenir compléter plus
-            tard.
-          </p>
-          <div class="btn-row" style="margin-top: 0.9rem">
-            <button class="btn ghost sm" id="man-csv">Exporter en CSV</button>
-            <button
-              class="btn ghost sm"
-              id="man-urls"
-              title="Une URL par ligne, groupée par source, pour un téléchargeur en lot"
-            >
-              Exporter les URL (.txt)
-            </button>
-            <button class="btn ghost sm" id="man-show">Voir la liste</button>
-            <button class="btn sm" id="verify-btn">Vérifier un dossier</button>
-          </div>
-          <!-- Repli pour Brave et Firefox, qui n'ont pas showDirectoryPicker.
-           Masqué : déclenché par le bouton « Vérifier un dossier ». -->
-          <input
-            type="file"
-            id="folder-input"
-            webkitdirectory
-            directory
-            multiple
-            accept="audio/*"
-            style="display: none"
-          />
-          <div
-            id="man-list"
-            class="stack hidden"
-            style="margin-top: 0.9rem"
-          ></div>
-          <div id="verify-report" style="margin-top: 0.9rem"></div>
-          <div
-            id="match-table"
-            class="stack hidden"
-            style="margin-top: 0.9rem"
-          ></div>
-          <div id="excluded-zone" class="hidden" style="margin-top: 1rem">
-            <div class="eyebrow">Morceaux écartés</div>
-            <div
-              id="excluded-list"
-              class="stack"
-              style="margin-top: 0.4rem"
-            ></div>
-          </div>
-          <div
-            id="match-actions"
-            class="btn-row hidden"
-            style="margin-top: 0.9rem"
-          >
-            <button class="btn" id="match-confirm">
-              Valider l'appariement
-            </button>
-            <button class="btn ghost" id="match-cancel">Annuler</button>
-          </div>
-        </div>
-
-        <!-- ─────────── ÉTAPE 2 — OPTIONS & LANCEMENT ─────────── -->
-
-        <!-- Les règles sont des propriétés de la SOIRÉE : elles se décident
-         ici, au calme, pas sur l'écran de jeu que la salle regarde. -->
-        <div class="card step-block" data-step="2" id="s-options">
-          <div class="card-head"><h2>Options de jeu</h2></div>
-
-          <div class="eyebrow" style="margin-top: 0.5rem">Déroulement</div>
-          <label
-            class="game-opt"
-            title="Titre, artiste et pochette sont floutés au démarrage de chaque manche. Le bouton 👁 du lecteur les révèle."
-          >
-            <input type="checkbox" id="opt-hide-indices" />
-            <span>Cacher les indices au démarrage</span>
-          </label>
-          <div
-            class="game-opt game-opt-range"
-            title="0 % démarre au début du morceau — utile si les intros font partie du jeu."
-          >
-            <label for="opt-key-moment">Sauter l'intro</label>
-            <input
-              type="range"
-              id="opt-key-moment"
-              min="0"
-              max="50"
-              step="5"
-              value="25"
-            />
-            <output id="opt-key-moment-val">25 %</output>
-          </div>
-
-          <div class="eyebrow" style="margin-top: 1rem">Règles de score</div>
-          <label
-            class="game-opt"
-            title="Toujours actif : chaque joueur qui désigne le bon proposant gagne 1 point."
-          >
-            <input type="checkbox" checked disabled />
-            <span class="muted"
-              >Trouveur : +1 par bonne réponse <em>(toujours actif)</em></span
-            >
-          </label>
-          <label
-            class="game-opt"
-            title="Un joueur désigné à tort gagne 1 point par vote erroné reçu. Le vote du proposant ne compte pas."
-          >
-            <input type="checkbox" id="opt-rule-bluffer" />
-            <span>Bluffeur : +1 par joueur bluffé</span>
-          </label>
-          <label
-            class="game-opt"
-            title="Le proposant gagne 1 point si personne ne l'a trouvé."
-          >
-            <input type="checkbox" id="opt-rule-trapper" />
-            <span>Piégeur : +1 si personne ne trouve</span>
-          </label>
-        </div>
-
-        <div class="card step-block" data-step="2" id="s-play">
-          <div class="card-head"><h2>Lancer la soirée</h2></div>
-          <p class="muted small">
-            Le lecteur pilote la partie : morceaux, votes, révélation. Garde cet
-            onglet sur le PC relié aux enceintes — la lecture se fait depuis ce
-            poste. Si tu veux jouer aussi, rejoins la soirée depuis ton
-            téléphone avec le lien partagé.
-          </p>
-          <a
-            class="btn"
-            id="play-btn"
-            style="margin-top: 0.9rem; text-decoration: none"
-            >▶ Aller au lecteur</a
-          >
-          <div class="btn-row" style="margin-top: 0.9rem">
-            <button
-              class="btn ghost sm"
-              id="export-party"
-              title="Sauvegarde complète : participants et morceaux"
-            >
-              Sauvegarder la soirée
-            </button>
-          </div>
+        <div>
+          <label class="lbl" for="q-max">Maximum par joueur</label>
+          <input class="field" id="q-max" type="number" min="1" max="50">
+          <p class="muted small" id="q-floor" style="margin-top:.3rem"></p>
         </div>
       </div>
-    </section>
+      <p class="muted small" style="margin-top:.5rem">
+        Le minimum pousse chacun à se dévoiler, le maximum évite qu'une seule
+        personne remplisse la playlist.
+      </p>
+      <!-- L'estimation est la seule information qui permette de choisir un
+           quota en connaissance de cause : 6 × 6, ce sont 36 fichiers à
+           réunir et une soirée de trois heures. -->
+      <div class="banner info" id="q-estimate" style="margin-top:.75rem"></div>
 
-    <div class="toast" id="toast"></div>
-    <script src="/shared/room-status.js"></script>
-    <script src="/shared/matching.js"></script>
-    <script src="/shared/folder-store.js"></script>
-    <script src="/host/app.js"></script>
-  </body>
+      <!-- Mode YouTube uniquement : l'hôte peut constituer la playlist
+           lui-même, ou compléter celle des participants. -->
+      <details class="card-sub" data-mode="youtube" id="s-import" style="margin-top:1.25rem">
+        <summary>Ajouter des morceaux en lot</summary>
+        <p class="muted small" style="margin:.5rem 0">
+          Un lien YouTube par ligne. Les titres sont récupérés automatiquement.
+          Le quota du participant s'applique.
+        </p>
+        <label class="lbl" for="imp-who">Attribuer à</label>
+        <select class="field" id="imp-who"></select>
+        <textarea class="field" id="imp-urls" rows="5" style="margin-top:.6rem"
+                  placeholder="https://www.youtube.com/watch?v=…&#10;https://youtu.be/…"></textarea>
+        <div class="btn-row" style="margin-top:.6rem">
+          <button class="btn sm" id="imp-run">Importer</button>
+          <label class="btn ghost sm" style="cursor:pointer">
+            Depuis un fichier .txt / .json
+            <input type="file" id="imp-file" accept=".txt,.json,text/plain,application/json" hidden>
+          </label>
+        </div>
+        <div id="imp-report" style="margin-top:.6rem"></div>
+      </details>
+
+      <!-- Ni tableau ni seconde liste : le panneau de gauche montre déjà
+           chacun, ligne par ligne. Ce qu'il manque ici, c'est de quoi
+           décider — qui reste à relancer — et de quoi rafraîchir. -->
+      <div class="collect-recap" style="margin-top:1.5rem">
+        <div class="banner info" id="c-recap" style="flex:1"></div>
+        <span class="muted small" id="c-refreshed"></span>
+        <button class="btn ghost sm" id="btn-refresh" title="Actualiser joueurs et morceaux">↻ Actualiser</button>
+      </div>
+
+      <div class="card-head" style="margin-top:1.5rem"><h2>Verrouiller</h2></div>
+      <p class="muted small" id="lock-hint"></p>
+      <div class="btn-row" style="margin-top:.9rem">
+        <button class="btn" id="lock-btn">Verrouiller et numéroter</button>
+        <button class="btn ghost" id="unlock-btn">Rouvrir la collecte</button>
+      </div>
+    </div>
+
+    <!-- ─────────── ÉTAPE 1 — FICHIERS ─────────── -->
+
+    <!-- Mode YouTube : plus rien à télécharger ni à apparier. Reste à
+         s'assurer que chaque lien répondra le jour J. -->
+    <div class="card step-block" data-step="1" data-mode="youtube" id="s-links">
+      <div class="card-head"><h2>Vérifier les liens</h2></div>
+      <p class="muted small">
+        Une vidéo peut avoir été retirée, passée en privé, ou interdire la
+        lecture hors de YouTube depuis qu'elle a été proposée. Mieux vaut
+        le découvrir maintenant qu'en pleine manche.
+      </p>
+      <div class="btn-row" style="margin-top:.9rem">
+        <button class="btn" id="verify-links-btn">Vérifier la playlist</button>
+      </div>
+      <div id="links-report" style="margin-top:.9rem"></div>
+    </div>
+
+    <div class="card step-block" data-step="1" data-mode="fichiers" id="s-files">
+      <div class="card-head"><h2>Fichiers</h2></div>
+      <p class="muted small">
+        Télécharge les morceaux avec l'outil de ton choix — <b>aucun renommage
+        nécessaire</b>. Désigne ensuite le dossier : la console lit les tags de
+        chaque fichier, mesure sa durée et propose un appariement que tu
+        valides. Rien ne quitte ton poste.
+      </p>
+      <p class="muted small" style="margin-top:.5rem">
+        Une playlist incomplète ne bloque pas la soirée : les morceaux sans
+        fichier sont simplement écartés, et tu peux revenir compléter plus tard.
+      </p>
+      <div class="btn-row" style="margin-top:.9rem">
+        <button class="btn ghost sm" id="man-csv">Exporter en CSV</button>
+        <button class="btn ghost sm" id="man-urls" title="Une URL par ligne, groupée par source, pour un téléchargeur en lot">Exporter les URL (.txt)</button>
+        <button class="btn ghost sm" id="man-show">Voir la liste</button>
+        <button class="btn sm" id="verify-btn">Vérifier un dossier</button>
+      </div>
+      <!-- Repli pour Brave et Firefox, qui n'ont pas showDirectoryPicker.
+           Masqué : déclenché par le bouton « Vérifier un dossier ». -->
+      <input type="file" id="folder-input" webkitdirectory directory multiple
+             accept="audio/*" style="display:none">
+      <div id="man-list" class="stack hidden" style="margin-top:.9rem"></div>
+      <div id="verify-report" style="margin-top:.9rem"></div>
+      <div id="match-table" class="stack hidden" style="margin-top:.9rem"></div>
+      <div id="excluded-zone" class="hidden" style="margin-top:1rem">
+        <div class="eyebrow">Morceaux écartés</div>
+        <div id="excluded-list" class="stack" style="margin-top:.4rem"></div>
+      </div>
+      <div id="match-actions" class="btn-row hidden" style="margin-top:.9rem">
+        <button class="btn" id="match-confirm">Valider l'appariement</button>
+        <button class="btn ghost" id="match-cancel">Annuler</button>
+      </div>
+    </div>
+
+    <!-- ─────────── ÉTAPE 2 — OPTIONS & LANCEMENT ─────────── -->
+
+    <!-- Les règles sont des propriétés de la SOIRÉE : elles se décident
+         ici, au calme, pas sur l'écran de jeu que la salle regarde. -->
+    <div class="card step-block" data-step="2" id="s-options">
+      <div class="card-head"><h2>Options de jeu</h2></div>
+
+      <div class="eyebrow" style="margin-top:.5rem">Déroulement</div>
+      <label class="game-opt" title="Titre, artiste et pochette sont floutés au démarrage de chaque manche. Le bouton 👁 du lecteur les révèle.">
+        <input type="checkbox" id="opt-hide-indices">
+        <span>Cacher les indices au démarrage</span>
+      </label>
+      <div class="game-opt game-opt-range" title="0 % démarre au début du morceau — utile si les intros font partie du jeu.">
+        <label for="opt-key-moment">Sauter l'intro</label>
+        <input type="range" id="opt-key-moment" min="0" max="50" step="5" value="25">
+        <output id="opt-key-moment-val">25 %</output>
+      </div>
+
+      <div class="eyebrow" style="margin-top:1rem">Règles de score</div>
+      <label class="game-opt" title="Toujours actif : chaque joueur qui désigne le bon proposant gagne 1 point.">
+        <input type="checkbox" checked disabled>
+        <span class="muted">Trouveur : +1 par bonne réponse <em>(toujours actif)</em></span>
+      </label>
+      <label class="game-opt" title="Un joueur désigné à tort gagne 1 point par vote erroné reçu. Le vote du proposant ne compte pas.">
+        <input type="checkbox" id="opt-rule-bluffer">
+        <span>Bluffeur : +1 par joueur bluffé</span>
+      </label>
+      <label class="game-opt" title="Le proposant gagne 1 point si personne ne l'a trouvé.">
+        <input type="checkbox" id="opt-rule-trapper">
+        <span>Piégeur : +1 si personne ne trouve</span>
+      </label>
+    </div>
+
+    <div class="card step-block" data-step="2" id="s-play">
+      <div class="card-head"><h2>Lancer la soirée</h2></div>
+      <p class="muted small">
+        Le lecteur pilote la partie : morceaux, votes, révélation. Garde
+        cet onglet sur le PC relié aux enceintes — la lecture se fait
+        depuis ce poste. Si tu veux jouer aussi, rejoins la soirée depuis
+        ton téléphone avec le lien partagé.
+      </p>
+      <a class="btn" id="play-btn" style="margin-top:.9rem;text-decoration:none">▶ Aller au lecteur</a>
+      <div class="btn-row" style="margin-top:.9rem">
+        <button class="btn ghost sm" id="export-party" title="Sauvegarde complète : participants et morceaux">Sauvegarder la soirée</button>
+      </div>
+    </div>
+
+    </div><!-- /.wrap -->
+  </div><!-- /.console-layout -->
+</section>
+
+<div class="toast" id="toast"></div>
+<script src="/shared/room-status.js"></script>
+<script src="/shared/matching.js"></script>
+<script src="/shared/folder-store.js"></script>
+<script src="/host/app.js"></script>
+</body>
 </html>

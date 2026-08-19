@@ -139,7 +139,8 @@ function registerHandlers(io, socket) {
     if (room.hostSocketId) {
       io.to(room.hostSocketId).emit(EVENTS.STATE_VOTE_PROGRESS, {
         voted: tally.voted, connected: tally.connected,
-        pending: tally.pending, votes: Rooms.votesAsArray(room),
+        pending: tally.pending, pendingIds: tally.pendingIds,
+        votes: Rooms.votesAsArray(room),
       });
     }
     if (!room.settings.autoReveal) return;
@@ -349,7 +350,7 @@ function registerHandlers(io, socket) {
       if (!room.hostSocketId) return;
       io.to(room.hostSocketId).emit(EVENTS.STATE_VOTE_PROGRESS, {
         voted: t.voted, connected: t.connected, pending: t.pending,
-        votes: Rooms.votesAsArray(room), stalled: true,
+        pendingIds: t.pendingIds, votes: Rooms.votesAsArray(room), stalled: true,
       });
       console.log(`[${room.code}] manche enlisée — ${t.pending.join(', ')} n'ont pas voté`);
     });

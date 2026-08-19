@@ -104,6 +104,25 @@
   };
 
   let toastTimer;
+  /**
+   * Moteur de lecture, choisi une fois pour toutes au démarrage.
+   *
+   * Les deux moteurs exposent le même contrat : le reste de la console
+   * ne sait pas lequel elle pilote. C'est ce qui permet aux deux modes
+   * de coexister sans que la logique de partie connaisse la différence.
+   */
+  let Engine = window.AudioEngine;
+  const isYouTube = () => Engine === window.YouTubeEngine;
+
+  /** Réf. de lecture d'un morceau : un fichier, ou un identifiant vidéo. */
+  function playRef(t) {
+    if (!t) return null;
+    // En mode YouTube, source_id EST l'identifiant de vidéo : le
+    // serveur l'a extrait et vérifié à la collecte, il n'y a pas à le
+    // redéduire de l'URL ici.
+    return isYouTube() ? (t.source_id || null) : t.file_name;
+  }
+
   function status(msg, kind) {
     const el = $('#game-status');
     if (!el) return;
@@ -164,8 +183,10 @@
     const silent = await FolderStore.recall(S.code);
     if (silent) {
       onFolder(await FolderStore.listFiles(silent));
-      $('#g-folder-report').insertAdjacentHTML('afterbegin',
-        '<div class="banner good">Dossier retrouvé depuis la préparation.</div>');
+      // Notification, pas bandeau : une bonne nouvelle n'a pas à rester
+      // à l'écran toute la soirée. Seuls les problèmes persistent, parce
+      // qu'eux demandent une action.
+      toast('Dossier retrouvé depuis la préparation.');
       return true;
     }
 
@@ -202,13 +223,27 @@
     // cliquables ni écoutables jusqu'au prochain rafraîchissement.
     renderAll();
 
-    el.innerHTML = missing.length
-      ? `<div class="banner warn">${indexed} fichier(s) chargé(s), mais ${missing.length} introuvable(s) :
+    /*
+     * Succès : une notification, pas un bandeau.
+     *
+     * « Playlist complète » est une confirmation ponctuelle. L'afficher
+     * en permanence occupait le panneau pour redire ce que la liste
+     * montre déjà — aucun morceau marqué absent.
+     *
+     * Échec partiel : le bandeau reste, lui. Nommer les fichiers
+     * manquants n'a d'intérêt que si l'hôte peut y revenir, ce qui
+     * suppose de pouvoir les relire.
+     */
+    if (missing.length) {
+      el.innerHTML =
+        `<div class="banner warn">${indexed} fichier(s) chargé(s), mais ${missing.length} introuvable(s) :
            ${missing.filter(Boolean).map(n => `<code>${n}</code>`).join(', ') || '(nom non enregistré)'}.
-           Ces morceaux seront ignorés pendant la partie.</div>`
-      : `<div class="banner good">${indexed} fichier(s) chargé(s) — playlist complète.</div>`
-      + (ignored ? `<p class="muted small" style="margin-top:.5rem">${ignored} fichier(s) sans numéro ignoré(s).</p>` : '');
-
+           Ces morceaux seront ignorés pendant la partie.</div>`;
+    } else {
+      el.innerHTML = '';
+      toast(`${indexed} fichier(s) chargé(s) — playlist complète.`);
+    }
+    if (ignored) toast(`${ignored} fichier(s) sans numéro ignoré(s).`);
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -239,6 +274,8 @@
       S.players = res.state.players;
       S.tracks = res.tracks;
       S.name = res.state.room.name;
+      S.sourceMode = res.state.room.sourceMode || 'fichiers';
+      selectEngine();
       renderRoomStatus();
       $('#g-code').textContent = res.state.room.code;
       renderRejoinQR();
@@ -299,6 +336,46 @@
             + encodeURIComponent(url);
   }
 
+  /**
+   * Aiguille vers le bon moteur, et adapte le lecteur en conséquence.
+   *
+   * En mode YouTube il n'y a pas de dossier à charger : le pied du
+   * panneau playlist perd ses commandes de fichier, et le vinyle cède
+   * la place à un rappel de la fenêtre de lecture.
+   */
+  function selectEngine() {
+    const youtube = S.sourceMode === 'youtube';
+    Engine = youtube ? window.YouTubeEngine : window.AudioEngine;
+    document.body.classList.toggle('mode-youtube', youtube);
+
+    if (!youtube) return;
+
+    Engine.onNeedWindow(() => {
+      status('La fenêtre de lecture est fermée — rouvre-la pour continuer.', 'error');
+      $('#yt-reopen').classList.remove('hidden');
+    });
+    Engine.onEnded(() => { if (S.round) status('Morceau terminé.'); });
+  }
+
+  /**
+   * Ouvre la fenêtre de lecture si besoin.
+   *
+   * Appelée depuis le clic de lancement, jamais au chargement : les
+   * navigateurs bloquent toute ouverture de fenêtre qui ne descend pas
+   * d'un geste de l'utilisateur.
+   */
+  async function ensurePlayerWindow() {
+    if (!isYouTube() || Engine.isOpen()) return true;
+    const ok = await Engine.openWindow().catch(() => false);
+    if (!ok) {
+      status('Autorise les fenêtres surgissantes pour ce site, puis réessaie.', 'error');
+      $('#yt-reopen').classList.remove('hidden');
+      return false;
+    }
+    $('#yt-reopen').classList.add('hidden');
+    return true;
+  }
+
   function renderRoomStatus() {
     RoomStatus.render($('#g-status'), {
       name: S.name || 'Soirée',
@@ -320,6 +397,12 @@
       // Les votes restent en mémoire pour le calcul des points, mais ne
       // sont plus affichés : seul le compte l'est.
       S.votes = t.votes || [];
+      // La liste porte l'attente : sans ce marquage, un vote entrant
+      // n'aurait plus rien fait bouger à l'écran.
+      if (Array.isArray(t.pendingIds)) {
+        for (const p of S.players) p.voted = t.pendingIds.indexOf(p.id) === -1;
+        renderPlayers();
+      }
       setWaitKpi(t.voted, t.connected, 'vote');
       if (S.round && !S.round.revealed) {
         renderWaitingFor({ done: t.voted, connected: t.connected, pending: t.pending }, 'vote');
@@ -389,10 +472,15 @@
   // ═══════════════════════════════════════════════════════════
 
   async function startRound(trackId) {
+    // La fenêtre de lecture doit exister AVANT d'annoncer la manche au
+    // serveur : ouvrir après coup laisserait les joueurs sur un écran
+    // de vote sans avoir rien entendu.
+    if (!(await ensurePlayerWindow())) return;
+
     // Ne proposer que des morceaux réellement présents sur le disque :
     // lancer une manche sans fichier bloquerait la partie.
     const playable = S.tracks.filter(t =>
-      AudioEngine.has(t.file_name) && !isPlayed(t.id));
+      Engine.has(playRef(t)) && !isPlayed(t.id));
     if (!playable.length) { toast('Plus aucun morceau jouable.', true); return; }
 
     const chosen = trackId
@@ -414,7 +502,7 @@
       setWaitKpi(0, S.players.filter(p => p.connected).length, 'vote');
 
       try {
-        await AudioEngine.play(chosen.file_name, res.startOffsetMs);
+        await Engine.play(playRef(chosen), res.startOffsetMs);
       } catch (err) {
         toast(err.message, true);
       }
@@ -572,10 +660,11 @@
    * qu'un fichier est le bon.
    */
   async function preview(trackId) {
+    if (!(await ensurePlayerWindow())) return;
     const t = S.tracks.find(x => x.id === trackId);
     if (!t) return;
     try {
-      await AudioEngine.play(t.file_name, 0);
+      await Engine.play(playRef(t), 0);
       S.previewing = t;
       document.body.classList.remove('indices-hidden');
       $('#np-title').textContent  = t.title;
@@ -659,7 +748,7 @@
     renderNowPlaying();
     renderPlayers();
     renderTracks();
-    $('#game-counter').textContent = `${played.size}/${S.tracks.length}`;
+    $('#game-counter').textContent = `${played.size}/${S.tracks.length} joués`;
     // Un seul bouton d'action à la fois — comme en v1 : soit on lance,
     // soit on révèle, jamais les deux.
     $('#btn-launch').classList.toggle('hidden', !!S.round);
@@ -693,14 +782,6 @@
    * c'est le seul signal que l'hôte a besoin de percevoir du coin de
    * l'œil pour savoir qu'il peut enchaîner.
    */
-  function setKpi(sel, value, total, active) {
-    const el = $(sel);
-    if (!el) return;
-    el.querySelector('.lk-v').textContent = `${value}/${total}`;
-    el.classList.toggle('complete', total > 0 && value >= total);
-    el.classList.toggle('idle', !active);
-  }
-
   /**
    * Compteur d'attente unique.
    *
@@ -718,8 +799,7 @@
 
   function setWaitKpi(value, total, kind) {
     if (kind !== waitKind()) return;      // phase dépassée, on ignore
-    $('#kpi-wait-label').textContent = kind === 'vote' ? 'votes' : 'prêts';
-    setKpi('#kpi-wait', value, total, true);
+    $('#pl-kpi').textContent = `${value}/${total} ${kind === 'vote' ? 'votes' : 'prêts'}`;
   }
 
   /** Pochette sur le vinyle, ou pastille centrale a defaut. */
@@ -757,16 +837,49 @@
     document.body.classList.toggle('indices-hidden', S.settings.hideIndices !== false);
   }
 
+  /**
+   * Panneau joueurs.
+   *
+   *  Il porte désormais l'attente, à la place des compteurs du centre.
+   *  Nommer vaut mieux que compter : « 3/5 votes » oblige à chercher
+   *  qui manque, alors que la liste le montre. Le décompte reste en
+   *  titre de panneau, pour le coup d'œil de loin.
+   *
+   *  Un seul état par ligne : pendant le vote c'est « a voté », après
+   *  la révélation c'est « prêt ». Les deux ne coexistent jamais, et
+   *  les afficher ensemble ferait lire deux colonnes dont une éteinte.
+   */
   function renderPlayers() {
-    $('#pl-count').textContent = S.players.filter(p => p.connected).length;
-    $('#pl-list').innerHTML = S.players.map(p => `
-      <div class="player-item ${p.connected ? '' : 'offline'} ${p.ready ? 'ready' : ''}">
-        <span class="player-dot" style="background:${esc(p.color)};box-shadow:0 0 8px ${esc(p.color)}"></span>
-        <span class="grow">${esc(p.name)}</span>
-        ${p.canBeAnswer ? '' : '<span class="tag-mini">sans morceau</span>'}
-        ${p.ready ? '<span class="tag-mini ok">prêt</span>' : ''}
-        <span class="player-score">${p.score}</span>
-      </div>`).join('');
+    const connected = S.players.filter(p => p.connected);
+    $('#pl-count').textContent = connected.length;
+
+    const voting = !!(S.round && !S.round.revealed);
+    const done = connected.filter(p => voting ? p.voted : p.ready).length;
+    $('#pl-kpi').textContent = S.round || S.round === null && done
+      ? `${done}/${connected.length} ${voting ? 'votes' : 'prêts'}`
+      : '';
+
+    $('#pl-list').innerHTML = S.players.map(p => {
+      /*
+       * L'état se lit à la carte, pas à un mot.
+       *
+       * « A voté » ou « prêt » écrits à côté d'une carte déjà verte
+       * disaient deux fois la même chose, dans une colonne étroite où
+       * chaque caractère rogne le pseudo. Le décompte est dans le titre
+       * du panneau ; la carte marque les lignes.
+       */
+      const done = voting ? p.voted : p.ready;
+      return `
+      <div class="pitem ${p.connected ? '' : 'offline'} ${done ? 'done' : ''}"
+           title="${done ? (voting ? 'A voté' : 'Prêt') : ''}">
+        <div class="pitem-main">
+          <span class="pitem-dot on" style="--c:${esc(p.color)}"></span>
+          <span class="pitem-name">${esc(p.name)}</span>
+          ${p.canBeAnswer ? '' : '<span class="tag-mini">sans morceau</span>'}
+          <span class="pitem-score">${p.score}</span>
+        </div>
+      </div>`;
+    }).join('');
   }
 
   /**
@@ -804,7 +917,7 @@
     const anonBox = $('#tr-anon');
     if (anonBox) { anonBox.checked = anonymized(); anonBox.disabled = inGame(); }
     $('#tr-list').innerHTML = sortedTracks().map(t => {
-      const absent = !AudioEngine.has(t.file_name);
+      const absent = !Engine.has(playRef(t));
       const cls = ['track-item'];
       if (isPlayed(t.id)) cls.push('played');
       if (S.round && S.round.trackId === t.id) cls.push('now');
@@ -821,7 +934,7 @@
           <span class="track-idx">${String(t.acquisition_no).padStart(3, '0')}</span>
           <span class="grow">${esc(t.artist)} — ${esc(t.title)}</span>
           ${badge}
-          ${absent ? '<span class="tag-mini">absent</span>' : ''}
+          ${absent && !isYouTube() ? '<span class="tag-mini">absent</span>' : ''}
         </div>`;
     }).join('');
 
@@ -872,13 +985,13 @@
   // ─── Boucle d'affichage du lecteur ──────────────────────────
 
   setInterval(() => {
-    const pos = AudioEngine.position();
+    const pos = Engine.position();
     if (!pos || !pos.duration) return;
     $('#time-cur').textContent = mmss(pos.current);
     $('#time-tot').textContent = mmss(pos.duration);
     $('#progress-fill').style.width = `${(pos.current / pos.duration) * 100}%`;
-    $('#btn-pause').textContent = AudioEngine.isPlaying() ? '❚❚' : '▶';
-    $('#vinyl').classList.toggle('spinning', AudioEngine.isPlaying());
+    $('#btn-pause').textContent = Engine.isPlaying() ? '❚❚' : '▶';
+    $('#vinyl').classList.toggle('spinning', Engine.isPlaying());
   }, 500);
 
   // ═══════════════════════════════════════════════════════════
@@ -887,13 +1000,13 @@
 
   /** Avance ou recule, et consigne l'offset réellement joué. */
   async function skip(sec) {
-    const ms = await AudioEngine.skip(sec);
+    const ms = await Engine.skip(sec);
     if (ms != null && S.round) S.socket.emit(EVENTS.HOST_SET_OFFSET, { ms });
   }
 
   /** Saut absolu (clic sur la barre de progression). */
   async function skipTo(targetSec) {
-    const pos = AudioEngine.position();
+    const pos = Engine.position();
     if (!pos) return;
     await skip(targetSec - pos.current);
   }
@@ -912,12 +1025,12 @@
 
     $('#btn-launch').addEventListener('click', () => startRound());
     $('#btn-reveal').addEventListener('click', doReveal);
-    $('#btn-pause').addEventListener('click', () => AudioEngine.togglePause());
+    $('#btn-pause').addEventListener('click', () => Engine.togglePause());
     $('#btn-back10').addEventListener('click', () => skip(-10));
     $('#btn-fwd10').addEventListener('click', () => skip(10));
     $('#btn-fwd30').addEventListener('click', () => skip(30));
     $('#vol-slider').addEventListener('input', (e) => {
-      AudioEngine.setVolume(e.target.value / 100);
+      Engine.setVolume(e.target.value / 100);
       $('#vol-val').textContent = e.target.value + '%';
     });
 
@@ -927,7 +1040,7 @@
 
     // Seek par clic sur la barre, comme en v1.
     $('#progress-bar').addEventListener('click', async (e) => {
-      const pos = AudioEngine.position();
+      const pos = Engine.position();
       if (!pos || !pos.duration) return;
       const r = e.currentTarget.getBoundingClientRect();
       await skipTo(((e.clientX - r.left) / r.width) * pos.duration);
@@ -977,7 +1090,7 @@
     $('#btn-end').addEventListener('click', async () => {
       if (!confirm('Terminer la partie et afficher les scores ?\n\nLe salon reste ouvert : tu pourras revenir au lecteur ou en relancer une.')) return;
 
-      await AudioEngine.stop();
+      await Engine.stop();
       if (S.round) S.socket.emit(EVENTS.HOST_NEXT_ROUND, {});
       S.round = null;
       S.votes = [];
@@ -1005,7 +1118,7 @@
       if (e.target.matches('input, textarea, select')) return;
 
       switch (e.code) {
-        case 'Space':      e.preventDefault(); AudioEngine.togglePause(); break;
+        case 'Space':      e.preventDefault(); Engine.togglePause(); break;
         case 'ArrowRight': e.preventDefault(); skip(10);  break;
         case 'ArrowLeft':  e.preventDefault(); skip(-10); break;
         // Action principale contextuelle, comme en v1 : le même geste

@@ -15,6 +15,7 @@
    projet où une numérotation dit quelque chose de vrai.
    ════════════════════════════════════════════════════════════════ */
 
+
 .view { display: none; }
 .view.active { display: block; }
 
@@ -41,7 +42,6 @@
 
 /* ─── Partage ────────────────────────────────────────────────── */
 
-.share { display: flex; gap: 1.5rem; align-items: center; justify-content: space-between; }
 .code {
   font-family: 'Bebas Neue', sans-serif; font-size: 3.4rem; line-height: 1;
   letter-spacing: .3em; color: var(--accent);
@@ -55,6 +55,62 @@
 .qr { flex-shrink: 0; }
 .qr img { display: block; border-radius: var(--r-sm); background: #fff; padding: .35rem; width: 9rem; height: 9rem; }
 .qr .fallback { width: 9rem; text-align: center; font-size: .7rem; color: var(--muted); }
+
+/* ════════════════════════════════════════════════════════════════
+   MISE EN PAGE — panneau permanent + colonne de travail
+   ════════════════════════════════════════════════════════════════
+
+   Le panneau reprend l'emplacement et la largeur de celui du lecteur :
+   d'un écran à l'autre, « qui est là » se lit toujours au même endroit.
+
+   Il est délibérément SUBORDONNÉ au fil des étapes — fond plus sombre,
+   titres plus petits, pas de bordure de carte. Deux structures de
+   navigation de même poids se disputeraient l'attention, et c'est la
+   séquence des étapes qui doit gagner : elle seule dit quoi faire
+   ensuite.
+   ════════════════════════════════════════════════════════════════ */
+
+.console-layout {
+  display: grid;
+  grid-template-columns: var(--panel-w) 1fr;
+  /* Pas d'align-items: start — le panneau doit s'étirer sur toute la
+     hauteur, sinon il s'arrête à son contenu et laisse un vide sous
+     lui. */
+  min-height: calc(100dvh - var(--topbar-h));
+}
+/* La console occupe TOUT ce qui reste : un plafond de largeur laissait
+   une bande morte à droite sur un écran large, alors que le panneau,
+   lui, était collé à gauche. */
+.console-layout > .wrap { margin: 0; max-width: none; }
+
+.col-people {
+  position: sticky; top: var(--topbar-h);
+  display: flex; flex-direction: column;
+  height: calc(100dvh - var(--topbar-h));
+  background: var(--surface); border-right: 1px solid var(--border);
+}
+.collect-recap { display: flex; align-items: center; gap: var(--s3); }
+.collect-recap .banner { margin: 0; }
+.col-people .empty { font-size: var(--t-small); }
+
+/* La carte de participant vient de base.css : même composant que dans
+   le lecteur. */
+/* ─── Ligne de participant ─── */
+.p-line + 
+/* En sommeil : l'avancement des paniers est figé, seule la présence
+   continue de bouger. */
+.panel-body.dormant 
+/* ─── Rejoindre, au pied du panneau ─── */
+
+@media (max-width: 900px) {
+  /* Sous cette largeur, deux colonnes ne tiennent pas : le panneau
+     repasse au-dessus, en flux. */
+  .console-layout { grid-template-columns: 1fr; }
+  .col-people {
+    position: static; height: auto; max-height: none;
+    border-right: none; border-bottom: 1px solid var(--border);
+  }
+  }
 
 /* ─── SIGNATURE : le fil des étapes ──────────────────────────── */
 
@@ -141,7 +197,6 @@
 .report-line .no { font-family: 'Bebas Neue', sans-serif; color: var(--muted); width: 2rem; }
 
 @media (max-width: 720px) {
-  .share { flex-direction: column; align-items: flex-start; }
   .qr { align-self: center; }
   .row2 { grid-template-columns: 1fr; }
   /* Le fil des étapes RESTE affiché : c'est l'élément signature de la
@@ -267,6 +322,31 @@
   .match-arrow { display: none; }
 }
 
+
+/* Les blocs propres à un mode sont masqués par la même mécanique que
+   les étapes — la classe .hidden posée depuis renderSteps() — plutôt
+   que par une règle CSS concurrente qui se battrait avec elle. */
+.card-sub {
+  border: 1px solid var(--border); border-radius: var(--r-md);
+  padding: var(--s3); background: var(--surface2);
+}
+.card-sub > summary { cursor: pointer; font-size: var(--t-small); font-weight: 600; }
+textarea.field { resize: vertical; font-family: inherit; line-height: 1.5; }
+
+/* ─── Choix du mode d'alimentation ───────────────────────────── */
+
+.mode-choice { display: grid; gap: var(--s2); margin-top: var(--s2); }
+.mode-card {
+  display: flex; align-items: flex-start; gap: var(--s3);
+  padding: var(--s3); cursor: pointer;
+  border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--surface2); transition: border-color .15s;
+}
+.mode-card:hover { border-color: var(--accent-dim); }
+.mode-card:has(input:checked) { border-color: var(--accent); background: rgba(0,229,255,.06); }
+.mode-card input { margin-top: .25rem; accent-color: var(--accent); flex-shrink: 0; }
+.mode-card b { display: block; font-size: var(--t-body); margin-bottom: .2rem; }
+.mode-card span { display: block; font-size: var(--t-small); color: var(--muted); line-height: 1.45; }
 
 /* ─── Options de jeu ─────────────────────────────────────────── */
 

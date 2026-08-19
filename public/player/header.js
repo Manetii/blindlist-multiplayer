@@ -29,6 +29,9 @@ window.PlayerHeader = (() => {
     dotEl.style.boxShadow  = `0 0 .6rem ${color}`;
     if (brandEl) brandEl.classList.add('hidden');
     if (idEl) idEl.classList.remove('hidden');
+    // Le bouton de sortie n'a de sens qu'une fois une identité prise.
+    const leave = document.getElementById('pt-leave');
+    if (leave) leave.classList.remove('hidden');
   }
 
   /** Nom et état du salon, côté droit. */

@@ -155,8 +155,9 @@
     // selfRegistration est acquis : demander à l'hôte de saisir les
     // pseudos à la place des joueurs faisait double emploi avec l'écran
     // d'arrivée, qui gère déjà les homonymes.
+    const mode = (document.querySelector('input[name="np-mode"]:checked') || {}).value;
     const { ok, data } = await api('POST', '/api/host/parties', {
-      name, selfRegistration: true,
+      name, selfRegistration: true, sourceMode: mode || 'fichiers',
     });
     $('#np-create').disabled = false;
 
@@ -250,11 +251,28 @@
     renderQR(shareUrl());
     checkNetwork();
 
-    renderQuota();
-    renderGameOptions();
-    renderSteps();
+    /*
+     * Chaque rendu est isolé.
+     *
+     * Ils s'exécutaient à la suite : la moindre exception dans l'un
+     * avortait tous les suivants, dont renderSteps(), et les blocs
+     * restaient dans l'état de visibilité du rendu précédent. D'où des
+     * sections qui « disparaissaient au hasard » — le hasard étant en
+     * fait la donnée qui déclenchait l'erreur.
+     *
+     * On isole donc, et on trace : un panneau muet vaut mieux qu'une
+     * console à moitié peinte, et une erreur visible en journal vaut
+     * mieux qu'un symptôme inexplicable.
+     */
+    for (const [name, fn] of [
+      ['mode', renderMode], ['import', renderImportTargets],
+      ['quota', renderQuota], ['recap', renderRecap],
+      ['options', renderGameOptions], ['steps', renderSteps],
+    ]) {
+      try { fn(); }
+      catch (err) { console.error(`[console] rendu « ${name} » en échec :`, err); }
+    }
     renderPeople();
-    renderProgress();
     renderDupes();
     renderLock();
   }
@@ -397,8 +415,24 @@
     $('#step-prev').disabled = currentStep === 0;
     $('#step-next').disabled = currentStep === STEPS.length - 1;
 
+    // Un bloc s'affiche s'il appartient à l'étape courante ET, quand il
+    // est propre à un mode d'alimentation, si c'est celui de la soirée.
+    // « Vérifier les liens » et « Fichiers » occupent la même étape et
+    // s'excluent : les montrer ensemble laisse croire qu'il faut faire
+    // les deux.
+    const mode = (state.party || {}).source_mode || 'fichiers';
     document.querySelectorAll('.step-block').forEach(el => {
-      el.classList.toggle('hidden', Number(el.dataset.step) !== currentStep);
+      const wrongStep = Number(el.dataset.step) !== currentStep;
+      // Boolean() n'est PAS décoratif. `el.dataset.mode && …` vaut
+      // `undefined` sur un bloc sans data-mode, et classList.toggle
+      // avec un second argument `undefined` l'ignore : il bascule au
+      // lieu de forcer. Les sections s'inversaient donc à chaque rendu,
+      // ce qui donnait l'impression d'une disparition aléatoire.
+      const wrongMode = Boolean(el.dataset.mode) && el.dataset.mode !== mode;
+      el.classList.toggle('hidden', Boolean(wrongStep || wrongMode));
+    });
+    document.querySelectorAll('[data-mode]:not(.step-block)').forEach(el => {
+      el.classList.toggle('hidden', el.dataset.mode !== mode);
     });
 
     // Les doublons n'ont d'intérêt que s'il y en a. Ils appartiennent à
@@ -424,27 +458,109 @@
 
   // ─── H2 — Participants ──────────────────────────────────────
 
+  /**
+   * Le panneau permanent : qui est là, et où il en est.
+   *
+   *  UNE liste, DEUX mesures. Pendant la collecte, chaque ligne montre
+   *  l'avancement du panier — c'est la seule chose qui bouge et la
+   *  seule qui appelle une relance. Passé le verrouillage, les paniers
+   *  sont figés : la liste se met en sommeil et ne garde qu'un voyant
+   *  de présence, parce qu'à ce moment la question devient « qui est
+   *  déjà là ».
+   *
+   *  Deux cartes séparées disaient ces deux choses des mêmes personnes,
+   *  et l'une des deux était toujours redondante.
+   */
   function renderPeople() {
-    $('#p-count').textContent = state.participants.length;
     const el = $('#p-list');
+    const collecting = state.party && state.party.state === 'collecte';
+
+    $('#p-count').textContent = state.participants.length;
+    $('#p-list').classList.toggle('dormant', !collecting);
+
     if (!state.participants.length) {
-      el.innerHTML = '<p class="empty">Ajoute les joueurs, puis partage le lien.<br>Chacun choisira son nom dans la liste.</p>';
+      el.innerHTML = '<p class="empty">Personne pour l\'instant.<br>Partage le code : chacun saisira son nom.</p>';
       return;
     }
-    el.innerHTML = state.participants.map(p => `
-      <div class="line" style="--c:${esc(p.color)}">
-        <span class="grow">${esc(p.display_name)}</span>
-        <span class="tag ${p.claimed ? 'ok' : 'wait'}">${p.claimed ? 'connecté' : 'libre'}</span>
-        <span class="acts">
-          ${p.claimed ? `<button class="icon-btn" data-release="${p.id}" title="Libérer ce nom">↺</button>` : ''}
-          <button class="icon-btn danger" data-remove="${p.id}" title="Supprimer">✕</button>
-        </span>
-      </div>`).join('');
+
+    // Index de l'avancement, pour joindre les deux sources sans
+    // dépendre de leur ordre respectif.
+    const prog = new Map(state.progress.map(r => [r.participant_id, r]));
+    const min = state.party.min_tracks_per_person;
+    const max = state.party.max_tracks_per_person;
+
+    const rows = state.participants.slice().sort((a, b) => {
+      if (!collecting) return a.display_name.localeCompare(b.display_name, 'fr');
+      // En collecte, les retardataires remontent : ce sont eux qu'on
+      // relance.
+      const na = Number((prog.get(a.id) || {}).tracks_submitted || 0);
+      const nb = Number((prog.get(b.id) || {}).tracks_submitted || 0);
+      return na - nb;
+    });
+
+    el.innerHTML = rows.map(p => {
+      const r = prog.get(p.id) || {};
+      const n = Number(r.tracks_submitted || 0);
+      const online = p.connected === true;
+
+      /*
+       * Trois états de présence, pas deux.
+       *
+       * Une pastille éteinte voudrait dire à la fois « nom libre » et
+       * « occupé mais déconnecté ». Les deux appellent des gestes
+       * opposés — attendre, ou relancer —, d'où l'anneau pointillé.
+       */
+      const dotClass = !p.claimed ? 'free' : (online ? 'on' : 'off');
+      const dotTitle = !p.claimed ? 'Nom libre'
+                     : (online ? 'En ligne' : 'Hors ligne');
+      const dot = `<span class="pitem-dot ${dotClass}" style="--c:${esc(p.color)}" title="${dotTitle}"></span>`;
+
+      const acts = `<span class="pitem-acts">
+            ${p.claimed ? `<button class="icon-btn" data-release="${p.id}" title="Libérer ce nom">↺</button>` : ''}
+            <button class="icon-btn danger" data-remove="${p.id}" title="Supprimer">✕</button>
+          </span>`;
+
+      if (!collecting) {
+        // En sommeil : afficher une jauge figée donnerait à croire
+        // qu'elle peut encore bouger.
+        return `<div class="pitem ${online ? '' : 'offline'}">
+          <div class="pitem-main">${dot}<span class="pitem-name">${esc(p.display_name)}</span>${acts}</div>
+        </div>`;
+      }
+
+      const segs = Array.from({ length: max }, (_, i) =>
+        `<i class="${i < n ? 'on' : ''}${i === min - 1 ? ' thr' : ''}"></i>`).join('');
+
+      /*
+       * L'état de la sélection vit sur la SECONDE rangée.
+       *
+       * Sur la première, il aurait fallu le loger à côté du pseudo et
+       * du bouton d'action, dans une colonne de 16,7 rem : il ne
+       * restait qu'une cinquantaine de pixels pour le nom. En dessous,
+       * à côté du compteur, il y a la place.
+       */
+      const etat = r.submitted
+        ? '<span class="tag ok">validée</span>'
+        : '<span class="tag">non validée</span>';
+
+      return `<div class="pitem" style="--c:${
+        r.submitted ? 'var(--ok)' : r.meets_minimum ? 'var(--accent)' : 'var(--warn)'}">
+        <div class="pitem-main">
+          ${dot}
+          <span class="pitem-name">${esc(p.display_name)}</span>
+          ${acts}
+        </div>
+        <div class="pitem-sub">
+          <span class="pitem-segs">${segs}</span>
+          <span class="pitem-count">${n}/${max}</span>
+          ${etat}
+        </div>
+      </div>`;
+    }).join('');
 
     el.querySelectorAll('[data-remove]').forEach(b => b.addEventListener('click', () => removePerson(b.dataset.remove)));
     el.querySelectorAll('[data-release]').forEach(b => b.addEventListener('click', () => releasePerson(b.dataset.release)));
   }
-
 
   async function removePerson(id) {
     const p = state.participants.find(x => x.id === id);
@@ -461,38 +577,6 @@
   }
 
   // ─── H3 — Complétion ────────────────────────────────────────
-
-  function renderProgress() {
-    const el = $('#prog-list');
-    if (!state.progress.length) { el.innerHTML = '<p class="empty">Personne pour l\'instant.</p>'; return; }
-
-    const min = state.party.min_tracks_per_person;
-    const max = state.party.max_tracks_per_person;
-
-    el.innerHTML = state.progress
-      .slice()
-      .sort((a, b) => a.tracks_submitted - b.tracks_submitted)
-      .map(r => {
-        const n = Number(r.tracks_submitted);
-        const segs = Array.from({ length: max }, (_, i) =>
-          `<i class="${i < n ? 'on' : ''}${i === min - 1 ? ' thr' : ''}"></i>`).join('');
-        // Trois états distincts, trois relances différentes : pas assez
-        // de morceaux, assez mais pas validé, terminé.
-        const color = r.submitted ? 'var(--ok)' : r.meets_minimum ? 'var(--accent)' : 'var(--warn)';
-        const tag = r.submitted
-          ? '<span class="tag ok">validée</span>'
-          : r.meets_minimum ? '<span class="tag">non validée</span>' : '';
-        return `
-          <div class="line" style="--c:${color}">
-            <span class="grow">
-              ${esc(r.display_name)}
-              <span class="sub">${n} morceau${n > 1 ? 'x' : ''}${r.meets_minimum ? '' : ` · minimum ${min}`}</span>
-            </span>
-            <span class="segs">${segs}</span>
-            ${tag}
-          </div>`;
-      }).join('');
-  }
 
   // ─── H4 — Arbitrage ─────────────────────────────────────────
 
@@ -523,6 +607,158 @@
         await loadConsole();
       });
     });
+  }
+
+  // ─── Mode d'alimentation ────────────────────────────────────
+
+  /**
+   * Rappelle le mode, et propose d'en changer TANT QUE c'est sans
+   * conséquence.
+   *
+   * Le verrou n'est pas le verrouillage de la collecte mais le premier
+   * morceau proposé : au-delà, basculer effacerait des paniers qu'on ne
+   * sait pas traduire d'un mode à l'autre. Le serveur applique la même
+   * règle — l'interface ne fait que l'annoncer avant qu'on la heurte.
+   */
+  function renderMode() {
+    const el = $('#c-mode');
+    if (!el) return;
+    const youtube = state.party.source_mode === 'youtube';
+    // Number() malgré le cast en base : une vue peut être recréée, un
+    // pilote changer de politique, et la concaténation silencieuse
+    // qu'on a subie ne laisse aucune trace dans les journaux.
+    const nTracks = (state.progress || [])
+      .reduce((n, p) => n + Number(p.tracks_submitted || 0), 0);
+
+    const label = youtube
+      ? 'Liens YouTube — chacun colle une URL, rien à télécharger.'
+      : 'Fichiers audio — tu récupères les morceaux et tu les apparies.';
+
+    el.innerHTML = `<span>${label}</span>` + (nTracks === 0
+      ? ` <button class="btn ghost sm" id="c-mode-switch" style="margin-left:auto">
+            Passer en mode ${youtube ? 'fichiers' : 'YouTube'}</button>`
+      : ` <span class="muted small" style="margin-left:auto">Figé : ${nTracks} morceau${
+            nTracks > 1 ? 'x proposés' : ' proposé'}.</span>`);
+
+    const btn = $('#c-mode-switch');
+    if (btn) btn.addEventListener('click', () =>
+      saveSetting({ sourceMode: youtube ? 'fichiers' : 'youtube' }, 'Mode changé.'));
+  }
+
+  // ─── Mode YouTube : vérification et import ──────────────────
+
+  /**
+   * Confronte chaque lien à YouTube.
+   *
+   * Le rapport reprend la forme de celui de la vérification de dossier :
+   * un décompte, puis la liste nominative de ce qui coince. Nommer le
+   * proposant permet à l'hôte de lui demander une autre version plutôt
+   * que de trancher seul.
+   */
+  async function verifyLinks() {
+    const el = $('#links-report');
+    const btn = $('#verify-links-btn');
+    btn.disabled = true;
+    el.innerHTML = '<p class="muted small">Vérification en cours…</p>';
+
+    const { ok, data } = await api('POST', `/api/host/parties/${state.code}/verify-links`);
+    btn.disabled = false;
+
+    if (!ok) { el.innerHTML = `<div class="banner bad">${esc(data.error || 'Vérification impossible.')}</div>`; return; }
+
+    if (!data.total) {
+      el.innerHTML = '<div class="banner warn">Aucun morceau à vérifier.</div>';
+      return;
+    }
+    if (data.ready) {
+      el.innerHTML = `<div class="banner good">${data.total} lien(s) vérifié(s) — la playlist est jouable.</div>`;
+    } else {
+      el.innerHTML =
+        `<div class="banner warn">${data.ok} lien(s) sur ${data.total} sont bons.
+           ${data.broken.length} poseront problème :</div>`
+        + '<div class="stack" style="margin-top:.6rem">'
+        + data.broken.map(b => `
+            <div class="line">
+              <div>
+                <b>${esc(b.title)}</b> — ${esc(b.artist)}
+                <div class="muted small">proposé par ${esc(b.proposedBy || '—')} · ${esc(b.error)}</div>
+              </div>
+              ${b.url ? `<a class="btn ghost sm" href="${esc(b.url)}" target="_blank" rel="noopener">Ouvrir</a>` : ''}
+            </div>`).join('')
+        + '</div>';
+    }
+    await loadConsole();
+  }
+
+  /** Options du sélecteur d'attribution, pour l'import en lot. */
+  function renderImportTargets() {
+    const sel = $('#imp-who');
+    if (!sel) return;
+    const keep = sel.value;
+    sel.innerHTML = state.participants
+      .map(p => `<option value="${esc(p.id)}">${esc(p.display_name)}</option>`).join('');
+    if (keep) sel.value = keep;
+  }
+
+  async function importLinks(text) {
+    const el = $('#imp-report');
+    // Une ligne par lien ; on tolère le JSON parce qu'un export d'une
+    // autre soirée est un point de départ légitime.
+    let items;
+    const trimmed = (text || '').trim();
+    if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        items = Array.isArray(parsed) ? parsed : (parsed.tracks || []);
+      } catch {
+        el.innerHTML = '<div class="banner bad">Ce fichier JSON est illisible.</div>';
+        return;
+      }
+    } else {
+      items = trimmed.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    }
+
+    if (!items.length) { el.innerHTML = '<div class="banner warn">Aucun lien trouvé.</div>'; return; }
+
+    el.innerHTML = `<p class="muted small">Import de ${items.length} lien(s)…</p>`;
+    const { ok, data } = await api('POST', `/api/host/parties/${state.code}/import-links`, {
+      participantId: $('#imp-who').value, items,
+    });
+    if (!ok) { el.innerHTML = `<div class="banner bad">${esc(data.error || 'Import impossible.')}</div>`; return; }
+
+    el.innerHTML =
+      `<div class="banner ${data.skipped.length ? 'warn' : 'good'}">
+         ${data.added.length} morceau(x) ajouté(s)${data.skipped.length ? `, ${data.skipped.length} écarté(s)` : ''}.</div>`
+      + (data.skipped.length
+          ? '<div class="stack" style="margin-top:.5rem">'
+            + data.skipped.map(s => `<div class="line"><div class="muted small">${esc(s.url || '—')} — ${esc(s.error)}</div></div>`).join('')
+            + '</div>'
+          : '');
+    $('#imp-urls').value = '';
+    await loadConsole();
+  }
+
+  /**
+   * Ce qui reste à faire avant de verrouiller, en une phrase.
+   *
+   * Nommer les retardataires suffit à les relancer ; en dresser un
+   * second tableau à côté du panneau qui les liste déjà obligerait
+   * l'hôte à se demander laquelle des deux listes fait foi.
+   */
+  function renderRecap() {
+    const el = $('#c-recap');
+    if (!el) return;
+    const prog = state.progress || [];
+    if (!prog.length) {
+      el.innerHTML = '<span>Personne n\'a encore rejoint la soirée.</span>';
+      return;
+    }
+    const late = prog.filter(r => !r.submitted).map(r => r.display_name);
+    el.className = late.length ? 'banner warn' : 'banner good';
+    el.innerHTML = late.length
+      ? `<span><b>${late.length}</b> ${late.length > 1 ? 'personnes n\'ont' : 'personne n\'a'} `
+        + `pas validé sa sélection : ${late.map(esc).join(', ')}.</span>`
+      : `<span>Les ${prog.length} sélections sont validées — tu peux verrouiller.</span>`;
   }
 
   // ─── Quota et estimation ────────────────────────────────────
@@ -1160,6 +1396,15 @@
   function bind() {
     $('#np-create').addEventListener('click', createParty);
     $('#np-name').addEventListener('keydown', e => { if (e.key === 'Enter') createParty(); });
+
+    $('#verify-links-btn').addEventListener('click', verifyLinks);
+    $('#imp-run').addEventListener('click', () => importLinks($('#imp-urls').value));
+    $('#imp-file').addEventListener('change', async (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      await importLinks(await f.text());
+      e.target.value = '';
+    });
 
     // Quota : on écrit sur « change », pas sur chaque frappe.
     $('#q-min').addEventListener('change', (e) =>

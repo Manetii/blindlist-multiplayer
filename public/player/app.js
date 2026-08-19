@@ -57,9 +57,14 @@
   const GAME_SCREENS = new Set(['vote', 'reveal', 'podium', 'results']);
 
   function show(name) {
+    // Source unique : currentScreen n'était mis à jour que par les
+    // bascules venues de game.js, jamais par celles du résolveur. Toute
+    // logique qui s'y fiait raisonnait donc sur un écran périmé.
+    currentScreen = name;
     $$('[data-screen]').forEach(el => el.classList.toggle('active', el.dataset.screen === name));
 
     if (window.PlayerHeader) {
+      if (state.me) PlayerHeader.setPseudo(state.me.displayName, state.me.color);
       PlayerHeader.showScore(GAME_SCREENS.has(name));
       if (state.party) {
         PlayerHeader.setRoom({
@@ -307,7 +312,22 @@
    *     évite qu'un incident réseau laisse quelqu'un bloqué toute la
    *     soirée sur un écran périmé.
    */
+  let currentScreen = null;
   let watchSocket = null;
+
+  /**
+   * Referme le canal de veille.
+   *
+   * Pendant la partie, game.js ouvre son propre socket : en garder un
+   * second faisait deux connexions par téléphone, deux reconnexions à
+   * chaque passage de tunnel, et deux fois plus d'occasions de
+   * trébucher pour rien — le socket de jeu reçoit déjà tout.
+   */
+  function stopWatching() {
+    if (!watchSocket) return;
+    watchSocket.close();
+    watchSocket = null;
+  }
 
   function startWatching() {
     if (watchSocket || !state.token || typeof io === 'undefined') return;
@@ -323,20 +343,32 @@
   }
 
   let pollTimer = null;
-  function schedulePoll(currentScreen) {
+  // Paramètre nommé `screen` et non `currentScreen` : il masquait la
+  // variable de module du même nom, ce qui rendait toute lecture du
+  // code ambiguë à l'endroit précis où l'ambiguïté coûte cher.
+  function schedulePoll(screen) {
     clearTimeout(pollTimer);
-    if (!['panier', 'attente', 'resultats'].includes(currentScreen)) return;
+    if (!['panier', 'attente', 'resultats'].includes(screen)) return;
     pollTimer = setTimeout(async () => {
-      if (document.hidden) { schedulePoll(currentScreen); return; }
+      if (document.hidden) { schedulePoll(screen); return; }
       const { ok, data } = await api('GET', '/api/me');
-      if (ok && data.screen !== currentScreen) { resolve(); return; }
-      schedulePoll(currentScreen);
+      if (ok && data.screen !== screen) { resolve(); return; }
+      schedulePoll(screen);
     }, 15000);
   }
 
   async function resolve() {
     clearTimeout(pollTimer);
-    show('loading');
+    /*
+     * L'écran de chargement n'apparaît qu'au PREMIER passage.
+     *
+     * Ensuite, on interroge sans rien effacer et on ne bascule que si
+     * la destination a changé. Blanchir l'écran à chaque résolution
+     * faisait clignoter la salle entière au moindre événement, et
+     * pouvait interrompre un vote en cours de saisie.
+     */
+    const first = !state.party;
+    if (first) show('loading');
     const { ok, status, data } = await api('GET', '/api/me');
 
     if (!ok) {
@@ -358,13 +390,26 @@
     state.quota  = data.quota;
     state.submitted = data.submitted === true;
 
-    // Le bandeau pseudo/score n'a de sens que pendant la partie.
-    // La barre reste en place quel que soit l'écran ; seule la partie
-    // droite change, et show() s'en charge.
+    // Dès qu'un nom est revendiqué, il remplace la marque dans la barre
+    // — y compris pendant la collecte, où l'on veut justement vérifier
+    // sous quelle identité on remplit son panier. Le brancher sur les
+    // seuls écrans de jeu laissait le logo affiché pendant toute la
+    // phase la plus longue de la soirée.
+    if (state.me && window.PlayerHeader) {
+      PlayerHeader.setPseudo(state.me.displayName, state.me.color);
+    }
 
 
     schedulePoll(data.screen);
-    startWatching();
+    if (data.screen === 'jeu') stopWatching(); else startWatching();
+
+    // Déjà en jeu et toujours en jeu : rien à refaire. Repasser par
+    // enter() relançait une résolution complète pour aboutir au même
+    // écran, en perdant au passage la saisie en cours.
+    if (data.screen === 'jeu' && window.PlayerApp.current() &&
+        ['vote', 'reveal', 'waiting', 'podium'].includes(window.PlayerApp.current())) {
+      return;
+    }
 
     switch (data.screen) {
       case 'panier':    renderCollect(); show('collect'); break;
@@ -385,7 +430,32 @@
   //  P1 — Collecte
   // ═══════════════════════════════════════════════════════════
 
+  /**
+   * Adapte l'écran de collecte au mode de la soirée.
+   *
+   * En mode YouTube il n'y a plus de catalogue à interroger : la
+   * recherche, ses filtres et sa liste de résultats n'ont rien à
+   * montrer. Les laisser en place ferait chercher dans le vide.
+   */
+  function renderMode() {
+    const youtube = (state.party || {}).sourceMode === 'youtube';
+    document.body.classList.toggle('mode-youtube', youtube);
+
+    const box = $('#paste-box');
+    if (box) box.open = youtube || box.open;
+
+    if (!youtube) return;
+
+    $('#paste-summary').textContent = 'Ajouter un morceau';
+    $('#paste-help').textContent =
+      'Colle le lien YouTube du morceau. Le titre et l\'artiste sont proposés '
+      + 'automatiquement — corrige-les si besoin, ce sont eux que la salle verra '
+      + 'à la révélation.';
+    $('#paste-url').placeholder = 'https://www.youtube.com/watch?v=…';
+  }
+
   function renderCollect() {
+    renderMode();
     // Nom de soirée et identité vivent dans la barre du haut : les
     // répéter en tête d'écran mangeait un tiers de la hauteur utile
     // d'un téléphone pour redire deux mots déjà lus.
@@ -441,7 +511,10 @@
     // c'était le cas sur l'écran d'attente.
     let button = '';
     if (mode === 'basket') {
-      button = `<button class="track-act remove" data-remove="${esc(t.id)}" aria-label="Retirer">−</button>`;
+      // Corriger AVANT retirer : c'est le geste le plus fréquent en mode
+      // YouTube, où titre et artiste sont saisis à la main.
+      button = `<button class="track-act" data-edit="${esc(t.id)}" aria-label="Corriger">✎</button>`
+             + `<button class="track-act remove" data-remove="${esc(t.id)}" aria-label="Retirer">−</button>`;
     } else if (mode === 'result') {
       button = `<button class="track-act" data-add="${esc(t.sourceId)}"
                    ${inBasket || full ? 'disabled' : ''}
@@ -522,6 +595,47 @@
     el.querySelectorAll('[data-remove]').forEach(b => {
       b.addEventListener('click', () => removeTrack(b.dataset.remove));
     });
+    el.querySelectorAll('[data-edit]').forEach(b => {
+      b.addEventListener('click', () => openEdit(b.dataset.edit));
+    });
+  }
+
+  /**
+   * Correction d'un morceau déjà déposé.
+   *
+   * Trois invites successives plutôt qu'un formulaire : on corrige une
+   * faute de frappe une fois sur vingt, et bâtir une modale pour ça
+   * coûterait plus d'écran que ça n'en fait gagner. Laisser un champ
+   * vide le conserve tel quel.
+   */
+  async function openEdit(trackId) {
+    const t = state.tracks.find(x => x.id === trackId);
+    if (!t) return;
+
+    const title = prompt('Titre :', t.title);
+    if (title === null) return;
+    const artist = prompt('Artiste :', t.artist);
+    if (artist === null) return;
+
+    const patch = {};
+    if (title.trim()  && title.trim()  !== t.title)  patch.title  = title.trim();
+    if (artist.trim() && artist.trim() !== t.artist) patch.artist = artist.trim();
+
+    // Le lien ne se propose qu'en mode YouTube : ailleurs il ne sert
+    // qu'au téléchargement, et le changer n'a pas d'effet sur le jeu.
+    if ((state.party || {}).sourceMode === 'youtube') {
+      const url = prompt('Lien YouTube (laisse tel quel si correct) :', t.url || '');
+      if (url === null) return;
+      if (url.trim() && url.trim() !== (t.url || '')) patch.url = url.trim();
+    }
+
+    if (!Object.keys(patch).length) return;
+
+    const { ok, data } = await api('PATCH', `/api/me/tracks/${trackId}`, patch);
+    if (!ok) { toast(data.error || 'Correction impossible.', true); return; }
+    state.tracks = data.tracks;
+    renderBasket();
+    toast('Morceau corrigé.');
   }
 
   /**
@@ -700,15 +814,6 @@
   // ═══════════════════════════════════════════════════════════
 
   function renderWait(customText) {
-    $('#wait-party').textContent = state.party.name;
-
-    // Rappeler qui l'on est : trois semaines après avoir rejoint, on ne
-    // se souvient plus sous quel nom on joue.
-    const me = $('#wait-me');
-    if (me && state.me) {
-      me.innerHTML = `Tu joues en tant que <b style="color:${esc(state.me.color)}">${esc(state.me.displayName)}</b>`;
-    }
-
     const texts = {
       verrouillee: 'Les envois sont clos. L\'hôte prépare la playlist.',
       prete: 'Tout est prêt. Rendez-vous le jour J.',
@@ -755,6 +860,25 @@
 
     $('#claim-new-btn').addEventListener('click', createName);
     $('#claim-new-name').addEventListener('keydown', e => { if (e.key === 'Enter') createName(); });
+
+    /*
+     * Quitter le salon depuis la barre du haut.
+     *
+     * On libère AVANT d'oublier le jeton : dans l'ordre inverse, on
+     * n'aurait plus de quoi s'authentifier auprès du serveur et le nom
+     * resterait occupé par un téléphone qui ne l'utilise plus.
+     */
+    $('#pt-leave').addEventListener('click', async () => {
+      if (!confirm('Quitter cette soirée ?\n\nTon nom redeviendra disponible et ce '
+                 + 'téléphone perdra l\'accès. Tes morceaux et ton score sont conservés — '
+                 + 'l\'organisateur peut te rendre l\'accès.')) return;
+      await api('POST', '/api/me/leave');
+      forgetSession(state.code);
+      state.party = null; state.me = null; state.tracks = [];
+      history.replaceState(null, '', '/player');
+      $('#code-input').value = '';
+      show('code');
+    });
 
     // Sortir d'une soirée sans dépendre d'un QR. On n'efface QUE celle-ci :
     // les autres jetons du téléphone restent valides.
@@ -848,10 +972,8 @@
    * basculer d'écran, d'afficher un toast et de redemander au
    * résolveur où aller quand le salon disparaît.
    */
-  let currentScreen = null;
-
   window.PlayerApp = {
-    show: (n) => { currentScreen = n; show(n); },
+    show,
     current: () => currentScreen,
     toast,
     reresolve: resolve,

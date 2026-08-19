@@ -33,6 +33,7 @@ const Rooms           = require('../rooms');
 const router = express.Router();
 
 const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+const youtube = require('../lib/youtube');
 
 // ═══ Réseau ══════════════════════════════════════════════════════
 
@@ -84,12 +85,15 @@ router.post('/parties',
   limit('create-party', 10, 60 * 60 * 1000,
         'Trop de soirées créées depuis cette adresse. Réessaie dans une heure.'),
   wrap(async (req, res) => {
-  const { name, minTracks, maxTracks, settings } = req.body || {};
+  const { name, minTracks, maxTracks, settings, sourceMode } = req.body || {};
   const { party, hostToken } = await partyRepo.create({
     name,
     minTracks: clampInt(minTracks, 1, 20, 3),
     maxTracks: clampInt(maxTracks, 1, 20, 6),
-    settings: settings || {},
+    // sourceMode arrive à plat dans le corps de la requête, comme
+    // selfRegistration : c'est une décision de création, pas un réglage
+    // caché dans un sous-objet.
+    settings: { ...(settings || {}), sourceMode, selfRegistration: true },
   });
   res.status(201).json({ party, hostToken });
 }));
@@ -102,7 +106,26 @@ router.get('/parties/:code', requirePartyOwner, wrap(async (req, res) => {
     partyRepo.progress(req.party.id),
     sessionRepo.pendingForHost(req.party.id),
   ]);
-  res.json({ party: req.party, participants, progress, session });
+  /*
+   * Présence en direct.
+   *
+   * `claimed` dit qu'un nom a été pris un jour ; il ne dit pas qui est
+   * là maintenant. La console en a besoin pour garder un voyant utile
+   * pendant les étapes où l'avancement des paniers, lui, n'a plus rien
+   * à raconter.
+   */
+  const room = Rooms.getRoom(req.party.code);
+  const live = new Set(
+    room ? Rooms.connectedPlayers(room).map(p => p.id) : []
+  );
+
+  res.json({
+    party: req.party,
+    participants: participants.map(p => ({ ...p, connected: live.has(p.id) })),
+    progress,
+    session,
+    roomOpen: !!room,
+  });
 }));
 
 /**
@@ -127,8 +150,19 @@ router.patch('/parties/:code/settings', requirePartyOwner, wrap(async (req, res)
   // rechargement : l'hôte coche une case et ne voit rien changer.
   const room = Rooms.getRoom(party.code);
   if (room) notify.settingsChanged(party.code, room.settings);
-  notify.partyChanged(party.code, party.state);
 
+  /*
+   * PAS de partyChanged ici — c'était une régression.
+   *
+   * Les téléphones traitent cet événement comme « l'état de la soirée a
+   * bougé, redemande où tu dois être » : écran de chargement, puis
+   * nouvelle résolution, puis re-entrée dans le jeu. Bouger le curseur
+   * d'intro pendant une partie faisait donc clignoter tous les
+   * téléphones de la salle.
+   *
+   * Un réglage n'est pas un changement d'état. settingsChanged suffit,
+   * et ne s'adresse qu'au lecteur.
+   */
   res.json({ party });
 }));
 
@@ -305,6 +339,128 @@ router.post('/parties/:code/reconcile',
       notify.partyChanged(req.party.code, 'prete');
     }
     res.json(report);
+  })
+);
+
+// ═══ H6 bis — Vérification des liens (mode YouTube) ══════════════
+
+/**
+ * Confronte la playlist à YouTube, lien par lien.
+ *
+ * Remplace l'appariement de fichiers : même place dans le parcours,
+ * même rôle — dire avant la soirée lesquels poseront problème. Une
+ * vidéo retirée ou passée en privé entre la collecte et le jour J ne
+ * se découvrirait sinon qu'en pleine manche.
+ *
+ * Concurrence bornée : trente requêtes simultanées vers oEmbed pour une
+ * playlist ordinaire n'apporterait rien qu'un risque de limitation.
+ */
+router.post('/parties/:code/verify-links',
+  requirePartyOwner, requirePartyState('verrouillee', 'prete'),
+  wrap(async (req, res) => {
+    if (req.party.source_mode !== 'youtube') {
+      return res.status(400).json({ error: 'Cette soirée fonctionne avec des fichiers audio.' });
+    }
+
+    const tracks = await trackRepo.playable(req.party.id);
+    const results = [];
+    const CONCURRENCY = 4;
+
+    for (let i = 0; i < tracks.length; i += CONCURRENCY) {
+      const batch = tracks.slice(i, i + CONCURRENCY);
+      const probes = await Promise.all(batch.map(async (t) => {
+        const id = youtube.parseId(t.url || t.source_id);
+        if (!id) {
+          return { id: t.id, ok: false, reason: 'no_id',
+                   error: 'Aucun lien YouTube utilisable.' };
+        }
+        const probe = await youtube.probe(id);
+        return probe.ok
+          ? { id: t.id, ok: true, unverified: probe.unverified === true,
+              youtubeTitle: probe.title || null }
+          : { id: t.id, ok: false, reason: probe.reason,
+              error: youtube.reasonText(probe.reason) };
+      }));
+
+      probes.forEach((p, k) => results.push({
+        ...p,
+        acquisitionNo: batch[k].acquisition_no,
+        title: batch[k].title,
+        artist: batch[k].artist,
+        proposedBy: batch[k].proposed_by,
+        url: batch[k].url,
+      }));
+    }
+
+    const broken = results.filter(r => !r.ok);
+    // « Prête » signifie : la soirée peut se jouer telle quelle. Un lien
+    // cassé restant, ce n'est plus vrai — mais les morceaux valides
+    // suffisent à jouer, donc on bascule quand même et on nomme ce qui
+    // manque, comme le fait la vérification de dossier.
+    const report = {
+      total: results.length,
+      ok: results.length - broken.length,
+      broken,
+      ready: broken.length === 0,
+      results,
+    };
+
+    if (results.length && req.party.state === 'verrouillee') {
+      report.party = await partyRepo.setState(req.party.id, 'prete');
+      notify.partyChanged(req.party.code, 'prete');
+    }
+    res.json(report);
+  })
+);
+
+/**
+ * Ajout en lot par l'hôte, pendant la collecte.
+ *
+ * Remplace le téléchargement du dossier : une liste de liens collée ou
+ * déposée en .txt / .json suffit à constituer une playlist. Les
+ * morceaux sont attribués à un participant — celui que l'hôte désigne,
+ * lui-même le plus souvent —, parce que le jeu a besoin de savoir qui
+ * a proposé quoi : sans propriétaire, une manche n'a pas de réponse.
+ *
+ * Le quota du participant s'applique : contourner ici la règle que
+ * l'écran joueur impose créerait un déséquilibre invisible.
+ */
+router.post('/parties/:code/import-links',
+  requirePartyOwner, requirePartyState('collecte'),
+  wrap(async (req, res) => {
+    if (req.party.source_mode !== 'youtube') {
+      return res.status(400).json({ error: 'Cette soirée fonctionne avec des fichiers audio.' });
+    }
+    const { participantId, items } = req.body || {};
+    if (!participantId) return res.status(400).json({ error: 'Choisis à qui attribuer ces morceaux.' });
+    if (!Array.isArray(items) || !items.length) {
+      return res.status(400).json({ error: 'Aucun lien à importer.' });
+    }
+    if (items.length > 100) return res.status(400).json({ error: 'Cent liens au maximum par import.' });
+
+    const added = [], skipped = [];
+    for (const raw of items) {
+      const url = typeof raw === 'string' ? raw : (raw && raw.url);
+      const ytId = youtube.parseId(url);
+      if (!ytId) { skipped.push({ url, error: 'Lien non reconnu.' }); continue; }
+
+      const probe = await youtube.probe(ytId);
+      if (!probe.ok) { skipped.push({ url, error: youtube.reasonText(probe.reason) }); continue; }
+
+      const title  = (raw && raw.title)  || probe.title  || 'Sans titre';
+      const artist = (raw && raw.artist) || probe.author || 'Inconnu';
+
+      const result = await trackRepo.add(participantId, {
+        source: 'youtube', sourceId: ytId,
+        title: String(title).slice(0, 300),
+        artist: String(artist).slice(0, 300),
+        album: null, durationMs: null, artworkUrl: null,
+        url: youtube.watchUrl(ytId),
+      });
+      if (result.ok) added.push({ url, title, artist });
+      else skipped.push({ url, error: result.error || 'Ajout refusé.' });
+    }
+    res.json({ added, skipped });
   })
 );
 

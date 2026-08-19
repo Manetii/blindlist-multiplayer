@@ -136,6 +136,53 @@ async function remove(participantId, trackId) {
   });
 }
 
+/**
+ * Corrige un morceau déjà déposé.
+ *
+ * Sans cette route, la seule façon de rattraper une faute de frappe
+ * était de supprimer puis de ré-ajouter — ce qui recompacte les
+ * positions et fait perdre son rang au morceau. En mode YouTube, où
+ * titre et artiste sont saisis à la main, l'erreur est fréquente et la
+ * correction doit être anodine.
+ *
+ * L'URL est modifiable aussi : c'est le cas « je me suis trompé de
+ * version ». Le contrôle d'intégrabilité est fait par l'appelant, qui
+ * seul sait dans quel mode se trouve la soirée.
+ */
+async function update(participantId, trackId, patch) {
+  return db.tx(async (t) => {
+    const ctx = await t.one(
+      `SELECT p.state FROM participants pa JOIN parties p ON p.id = pa.party_id
+        WHERE pa.id = $1`,
+      [participantId]
+    );
+    if (!ctx) return { ok: false, error: 'Participant inconnu.' };
+    if (ctx.state !== 'collecte') {
+      return { ok: false, error: 'Les envois sont clos.', closed: true };
+    }
+
+    const sets = [];
+    const values = [trackId, participantId];
+    for (const [key, column] of Object.entries({
+      title: 'title', artist: 'artist', url: 'url', sourceId: 'source_id',
+    })) {
+      if (patch[key] === undefined) continue;
+      values.push(String(patch[key]).slice(0, 500));
+      sets.push(`${column} = $${values.length}`);
+    }
+    if (!sets.length) return { ok: false, error: 'Rien à modifier.' };
+
+    const row = await t.one(
+      `UPDATE tracks SET ${sets.join(', ')}
+        WHERE id = $1 AND participant_id = $2
+        RETURNING id`,
+      values
+    );
+    if (!row) return { ok: false, error: 'Morceau introuvable.' };
+    return { ok: true };
+  });
+}
+
 // ─── Arbitrage (écran hôte) ─────────────────────────────────────
 
 /**
@@ -376,7 +423,7 @@ async function excludedList(partyId) {
 }
 
 module.exports = {
-  listByParticipant, add, remove, excludedList, exportList,
+  listByParticipant, add, remove, update, excludedList, exportList,
   findDuplicates, exclude, restore,
   manifest, reconcile, playable,
   DURATION_TOLERANCE_MS,

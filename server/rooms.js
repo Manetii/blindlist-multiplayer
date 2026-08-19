@@ -110,6 +110,7 @@ async function openRoom(party, hostSocketId) {
     code:         party.code,
     partyId:      party.id,
     partyName:    party.name,
+    sourceMode:   party.source_mode || 'fichiers',
     sessionId:    session.id,
     hostSocketId: hostSocketId || null,
 
@@ -358,6 +359,10 @@ function voteTally(room) {
     total: room.players.size,
     complete: connected.length >= QUORUM_FLOOR && voted.length === connected.length,
     pending: connected.filter(p => !room.round.votes.has(p.id)).map(p => p.name),
+    // Identifiants, pour que le panneau de l'hôte marque les lignes
+    // sans faire correspondre des pseudos. Ce sont les VOTANTS
+    // manquants, jamais leurs bulletins.
+    pendingIds: connected.filter(p => !room.round.votes.has(p.id)).map(p => p.id),
   };
 }
 
@@ -447,10 +452,15 @@ function setPaused(room, paused) {
 // ─── Sérialisation ──────────────────────────────────────────────
 
 function publicPlayers(room) {
+  // `voted` : le FAIT d'avoir voté, jamais POUR QUI. Le panneau de
+  // l'hôte doit pouvoir nommer les retardataires sans que l'écran que
+  // la salle regarde trahisse un seul bulletin.
+  const voted = room.round.active ? room.round.votes : null;
   return [...room.players.values()].map(p => ({
     id: p.id, name: p.name, color: p.color,
     score: p.score, connected: p.connected,
     ready: p.ready, canBeAnswer: p.canBeAnswer,
+    voted: voted ? voted.has(p.id) : false,
   }));
 }
 
@@ -466,6 +476,9 @@ function fullState(room) {
     room: {
       code: room.code,
       name: room.partyName,
+      // Détermine le moteur de lecture côté console : fichiers locaux
+      // ou fenêtre YouTube.
+      sourceMode: room.sourceMode || 'fichiers',
       hostOnline: !!room.hostSocketId,
       paused: room.paused,
       tracksTotal:  room.tracks.length,

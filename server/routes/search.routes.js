@@ -17,6 +17,7 @@
  */
 
 const express = require('express');
+const youtube = require('../lib/youtube');
 const { requireParticipant, requirePartyState } = require('../lib/auth');
 const { limit } = require('../lib/rate-limit');
 const itunes      = require('../lib/search/itunes');
@@ -24,6 +25,9 @@ const deezer      = require('../lib/search/deezer');
 const musicbrainz = require('../lib/search/musicbrainz');
 
 const router = express.Router();
+
+/** Renvoie les rejets d'une route asynchrone au gestionnaire d'erreurs. */
+const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 /**
  * Ajouter une source = ajouter une entrée ici. Rien d'autre à changer.
@@ -134,10 +138,51 @@ const URL_PATTERNS = [
 router.post('/search/resolve-url',
   requireParticipant,
   requirePartyState('collecte'),
-  (req, res) => {
+  wrap(async (req, res) => {
     const raw = String((req.body && req.body.url) || '').trim();
     if (!raw) return res.status(400).json({ error: 'Lien vide.' });
     if (raw.length > 500) return res.status(400).json({ error: 'Lien trop long.' });
+
+    /*
+     * Mode YouTube : un seul format accepté, et vérifié.
+     *
+     * L'URL ne sert plus à retrouver le morceau au téléchargement, elle
+     * EST le morceau. Une vidéo qui refuse l'intégration ou qui a été
+     * supprimée ne se découvrirait sinon qu'en pleine manche — le pire
+     * moment possible. oEmbed tranche tout de suite, sans clé d'API, et
+     * rend au passage de quoi pré-remplir la saisie.
+     */
+    if (req.party.source_mode === 'youtube') {
+      const id = youtube.parseId(raw);
+      if (!id) {
+        return res.status(422).json({
+          error: /playlist|list=/i.test(raw)
+            ? 'Ce lien pointe vers une playlist. Colle le lien d\'une vidéo précise.'
+            : 'Cette soirée n\'accepte que des liens YouTube.',
+        });
+      }
+
+      const probe = await youtube.probe(id);
+      if (!probe.ok) {
+        return res.status(422).json({ error: youtube.reasonText(probe.reason) });
+      }
+
+      return res.json({
+        track: {
+          source: 'youtube',
+          sourceId: id,
+          url: youtube.watchUrl(id),
+          // Pré-remplissage : le titre YouTube mélange souvent artiste
+          // et titre (« Artiste - Titre (Clip officiel) »), donc on le
+          // propose sans prétendre l'avoir découpé. Le participant
+          // corrige, c'est plus rapide que de tout saisir.
+          title: probe.title || '',
+          artist: probe.author || '',
+        },
+        platform: 'YouTube',
+        unverified: probe.unverified === true,
+      });
+    }
 
     for (const { source, re, label } of URL_PATTERNS) {
       const m = raw.match(re);
@@ -164,7 +209,7 @@ router.post('/search/resolve-url',
     res.status(422).json({
       error: 'Lien non reconnu. Spotify, YouTube, Deezer et Apple Music sont acceptés.',
     });
-  }
+  })
 );
 
 /**

@@ -1,207 +1,122 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
-  <head>
-    <meta charset="utf-8" />
-    <meta
-      name="viewport"
-      content="width=device-width,initial-scale=1,viewport-fit=cover"
-    />
-    <meta name="theme-color" content="#080b10" />
-    <title>Blind Test Party</title>
-    <link rel="stylesheet" href="/shared/base.css" />
-    <style>
-      body {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 1.5rem;
-      }
-      .box {
-        width: 100%;
-        max-width: 400px;
-        text-align: center;
-      }
-      .head {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 0.75rem;
-        margin-bottom: 2rem;
-      }
-      .actions {
-        display: flex;
-        flex-direction: column;
-        gap: 0.6rem;
-        margin-top: 1.75rem;
-      }
-      .resume {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        text-align: left;
-        background: var(--surface);
-        border: 1px solid var(--accent-dim);
-        border-radius: var(--radius);
-        padding: 0.85rem 1rem;
-        width: 100%;
-        color: var(--text);
-        cursor: pointer;
-        font-family: "Outfit", sans-serif;
-      }
-      .resume:hover {
-        background: var(--surface2);
-      }
-      .resume .code {
-        font-family: "Bebas Neue", sans-serif;
-        font-size: 1.4rem;
-        letter-spacing: 0.18em;
-        color: var(--accent);
-      }
-      .resume .sub {
-        font-size: 0.75rem;
-        color: var(--muted);
-      }
-      .sep {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        color: var(--muted);
-        font-size: 0.7rem;
-        letter-spacing: 0.2em;
-        margin: 1.5rem 0 0.5rem;
-      }
-      .sep::before,
-      .sep::after {
-        content: "";
-        flex: 1;
-        height: 1px;
-        background: var(--border);
-      }
-    </style>
-  </head>
-  <body>
-    <div class="box">
-      <div class="head">
-        <div class="mark"><span></span><span></span><span></span></div>
-        <h1 class="title">Blind<span>List</span> Party</h1>
-        <p class="tagline">Devinez qui a proposé quoi.</p>
-      </div>
-
-      <div id="resume-zone" class="hidden">
-        <div class="eyebrow" style="text-align: left; margin-bottom: 0.5rem">
-          Reprendre
-        </div>
-        <div id="resume-list" class="actions" style="margin-top: 0"></div>
-        <div class="sep">OU</div>
-      </div>
-
-      <div class="actions">
-        <a class="btn full" href="/player">Rejoindre une soirée</a>
-        <a class="btn ghost full" href="/h">Créer une soirée</a>
-      </div>
-
-      <p class="muted small" style="margin-top: 2rem">
-        Rejoindre demande le code de la soirée. Créer ne demande rien : tu
-        obtiens un code à partager.
-      </p>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#080b10">
+<title>Blind Test Party</title>
+<link rel="stylesheet" href="/shared/base.css">
+<style>
+  body { display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
+  .box { width: 100%; max-width: 400px; text-align: center; }
+  .head { display: flex; flex-direction: column; align-items: center; gap: .75rem; margin-bottom: 2rem; }
+  .actions { display: flex; flex-direction: column; gap: .6rem; margin-top: 1.75rem; }
+  .resume {
+    display: flex; align-items: center; gap: .75rem; text-align: left;
+    background: var(--surface); border: 1px solid var(--accent-dim);
+    border-radius: var(--radius); padding: .85rem 1rem; width: 100%;
+    color: var(--text); cursor: pointer; font-family: 'Outfit', sans-serif;
+  }
+  .resume:hover { background: var(--surface2); }
+  .resume .code { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; letter-spacing: .18em; color: var(--accent); }
+  .resume .sub { font-size: .75rem; color: var(--muted); }
+  .sep { display: flex; align-items: center; gap: .75rem; color: var(--muted); font-size: .7rem; letter-spacing: .2em; margin: 1.5rem 0 .5rem; }
+  .sep::before, .sep::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+</style>
+</head>
+<body>
+  <div class="box">
+    <div class="head">
+      <div class="mark"><span></span><span></span><span></span></div>
+      <h1 class="title">Blind<span>Test</span> Party</h1>
+      <p class="tagline">Devinez qui a proposé quoi.</p>
     </div>
 
-    <script>
-      /**
-       * Le bouton « Reprendre » n'apparaît que si ce navigateur porte déjà
-       * une identité. Sans lui, quelqu'un qui recharge la page devrait
-       * ressaisir un code qu'il a probablement oublié.
-       */
-      (() => {
-        const entries = [];
-        try {
-          const token = localStorage.getItem("blindtest:token");
-          const code = localStorage.getItem("blindtest:code");
-          if (token)
-            entries.push({ kind: "joueur", code: code || "", href: "/player" });
+    <div id="resume-zone" class="hidden">
+      <div class="eyebrow" style="text-align:left;margin-bottom:.5rem">Reprendre</div>
+      <div id="resume-list" class="actions" style="margin-top:0"></div>
+      <div class="sep">OU</div>
+    </div>
 
-          const parties = JSON.parse(
-            localStorage.getItem("blindtest:parties") || "{}",
-          );
-          for (const [c, p] of Object.entries(parties)) {
-            entries.push({
-              kind: "organisateur",
-              code: c,
-              name: p.name,
-              href: "/h/" + c,
-            });
-          }
-        } catch {
-          /* stockage indisponible */
-        }
+    <div class="actions">
+      <a class="btn full" href="/player">Rejoindre une soirée</a>
+      <a class="btn ghost full" href="/h">Créer une soirée</a>
+    </div>
 
-        if (!entries.length) return;
+    <p class="muted small" style="margin-top:2rem">
+      Rejoindre demande le code de la soirée. Créer ne demande rien : tu obtiens un code à partager.
+    </p>
+  </div>
 
-        render(entries);
+<script>
+/**
+ * Le bouton « Reprendre » n'apparaît que si ce navigateur porte déjà
+ * une identité. Sans lui, quelqu'un qui recharge la page devrait
+ * ressaisir un code qu'il a probablement oublié.
+ */
+(() => {
+  const entries = [];
+  try {
+    const token = localStorage.getItem('blindtest:token');
+    const code  = localStorage.getItem('blindtest:code');
+    if (token) entries.push({ kind: 'joueur', code: code || '', href: '/player' });
 
-        /**
-         * Une soirée supprimée depuis l'administration doit disparaître d'ici.
-         * On interroge le serveur pour chaque code connu : /api/join/:code
-         * répond 404 quand la soirée n'existe plus. L'affichage est immédiat,
-         * la correction arrive une seconde plus tard.
-         */
-        Promise.all(
-          entries.map(async (e) => {
-            if (!e.code) return e;
-            try {
-              const res = await fetch("/api/join/" + e.code);
-              return res.status === 404 ? null : e;
-            } catch {
-              return e; // réseau muet : on ne retire rien
-            }
-          }),
-        ).then((checked) => {
-          const alive = checked.filter(Boolean);
-          if (alive.length === entries.length) return;
+    const parties = JSON.parse(localStorage.getItem('blindtest:parties') || '{}');
+    for (const [c, p] of Object.entries(parties)) {
+      entries.push({ kind: 'organisateur', code: c, name: p.name, href: '/h/' + c });
+    }
+  } catch { /* stockage indisponible */ }
 
-          // Nettoyer aussi le stockage, sinon l'entrée revient au rechargement.
-          const codes = new Set(alive.map((e) => e.code));
-          try {
-            const parties = JSON.parse(
-              localStorage.getItem("blindtest:parties") || "{}",
-            );
-            for (const c of Object.keys(parties))
-              if (!codes.has(c)) delete parties[c];
-            localStorage.setItem("blindtest:parties", JSON.stringify(parties));
+  if (!entries.length) return;
 
-            const tokens = JSON.parse(
-              localStorage.getItem("blindtest:tokens") || "{}",
-            );
-            for (const c of Object.keys(tokens))
-              if (!codes.has(c)) delete tokens[c];
-            localStorage.setItem("blindtest:tokens", JSON.stringify(tokens));
-          } catch {
-            /* stockage indisponible */
-          }
+  render(entries);
 
-          if (!alive.length) {
-            document.getElementById("resume-zone").classList.add("hidden");
-            return;
-          }
-          render(alive);
-        });
+  /**
+   * Une soirée supprimée depuis l'administration doit disparaître d'ici.
+   * On interroge le serveur pour chaque code connu : /api/join/:code
+   * répond 404 quand la soirée n'existe plus. L'affichage est immédiat,
+   * la correction arrive une seconde plus tard.
+   */
+  Promise.all(entries.map(async (e) => {
+    if (!e.code) return e;
+    try {
+      const res = await fetch('/api/join/' + e.code);
+      return res.status === 404 ? null : e;
+    } catch {
+      return e;                 // réseau muet : on ne retire rien
+    }
+  })).then((checked) => {
+    const alive = checked.filter(Boolean);
+    if (alive.length === entries.length) return;
 
-        function render(list) {
-          document.getElementById("resume-zone").classList.remove("hidden");
-          document.getElementById("resume-list").innerHTML = list
-            .map(
-              (e) => `
+    // Nettoyer aussi le stockage, sinon l'entrée revient au rechargement.
+    const codes = new Set(alive.map(e => e.code));
+    try {
+      const parties = JSON.parse(localStorage.getItem('blindtest:parties') || '{}');
+      for (const c of Object.keys(parties)) if (!codes.has(c)) delete parties[c];
+      localStorage.setItem('blindtest:parties', JSON.stringify(parties));
+
+      const tokens = JSON.parse(localStorage.getItem('blindtest:tokens') || '{}');
+      for (const c of Object.keys(tokens)) if (!codes.has(c)) delete tokens[c];
+      localStorage.setItem('blindtest:tokens', JSON.stringify(tokens));
+    } catch { /* stockage indisponible */ }
+
+    if (!alive.length) { document.getElementById('resume-zone').classList.add('hidden'); return; }
+    render(alive);
+  });
+
+  function render(list) {
+    document.getElementById('resume-zone').classList.remove('hidden');
+    document.getElementById('resume-list').innerHTML = list.map(e => `
       <a class="resume" href="${e.href}">
-        <span class="code">${e.code || "····"}</span>
+        <span class="code">${e.code || '····'}</span>
         <span>
-          <span style="display:block">${e.name || "Ma sélection"}</span>
+          <span style="display:block">${e.name || 'Ma sélection'}</span>
           <span class="sub">en tant qu'${e.kind}</span>
         </span>
-      </a>`,
-            )
-            .join("");
-        }
-      })();
-    </script>
-  </body>
+      </a>`).join('');
+  }
+})();
+</script>
+</body>
 </html>

@@ -158,6 +158,126 @@ label.lbl { display: block; font-size: .72rem; letter-spacing: .12em; text-trans
 .btn-row { display: flex; gap: .5rem; flex-wrap: wrap; }
 
 /* ════════════════════════════════════════════════════════════════
+   PANNEAU LATÉRAL — console et lecteur
+   ════════════════════════════════════════════════════════════════
+
+   La console et le lecteur posent la même question à deux moments de
+   la soirée — qui est là, où il en est — et l'affichaient de deux
+   façons. Même largeur, même en-tête, même pied : passer de la
+   préparation au jeu ne doit pas donner l'impression de changer
+   d'application.
+   ════════════════════════════════════════════════════════════════ */
+
+:root { --panel-w: 16.7rem; }
+
+.panel-header {
+  display: flex; align-items: center; gap: .5rem;
+  padding: .7rem .9rem; flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+}
+.panel-title {
+  font-family: 'Bebas Neue', sans-serif; font-size: 1.05rem;
+  letter-spacing: .1em; margin-right: auto;
+  display: flex; align-items: baseline; gap: .4rem;
+}
+/* Compteur et indicateur de phase : même traitement des deux côtés. */
+/* Chiffre en accent, dans la même fonte que le titre : c'est le
+   traitement d'origine, et il se lit mieux qu'un compteur gris. */
+.panel-count { color: var(--accent); font-size: .95rem; letter-spacing: .06em; }
+/* Bouton d'angle — la croix du lecteur, le rafraîchissement de la
+   console : même place, même poids. */
+.panel-action {
+  flex-shrink: 0; width: 1.75rem; height: 1.75rem;
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: none; border-radius: var(--r-sm);
+  color: var(--muted); font-size: 1.1rem; line-height: 1; cursor: pointer;
+  font-family: inherit; transition: color .15s, background .15s;
+}
+.panel-action:hover { color: var(--text); background: var(--surface2); }
+.panel-body { flex: 1; overflow-y: auto; min-height: 0; padding: .6rem .9rem .9rem; }
+
+/* ── Carte de participant ──
+   Le même bloc dans la console et dans le lecteur. Ce qui change d'un
+   écran à l'autre, c'est ce qu'on y lit — des morceaux pendant la
+   préparation, des votes pendant la partie — pas la forme. */
+.pitem {
+  background: var(--surface2); border: 1px solid transparent;
+  border-radius: var(--r-sm); padding: .45rem .65rem; margin-bottom: .35rem;
+  font-size: .85rem;
+}
+.pitem-main { display: flex; align-items: center; gap: .5rem; }
+.pitem-dot {
+  width: .55rem; height: .55rem; border-radius: 50%; flex-shrink: 0;
+  background: var(--c, var(--muted));
+}
+/* Trois états visuels, parce qu'une pastille éteinte serait ambiguë :
+   « personne n'a pris ce nom » et « quelqu'un l'occupe mais n'est pas
+   connecté » appellent des gestes opposés. */
+.pitem-dot.on   { box-shadow: 0 0 .5rem var(--c); }
+.pitem-dot.off  { opacity: .3; }
+.pitem-dot.free { background: none; border: 1px dashed var(--muted); }
+.pitem-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pitem-score { font-family: 'Bebas Neue', sans-serif; color: var(--accent); font-size: 1rem; }
+
+/* Seconde rangée : volontairement fine et discrète. Elle porte le
+   détail — jauge, compteur, état de la sélection —, la première porte
+   l'identité. */
+.pitem-sub {
+  display: flex; align-items: center; gap: .5rem;
+  margin-top: .3rem; font-size: var(--t-micro); color: var(--muted);
+}
+.pitem-segs { display: flex; gap: 2px; flex: 1; min-width: 2.5rem; }
+.pitem-segs i {
+  flex: 1; min-width: 2px; height: 4px; border-radius: 2px;
+  background: var(--border); position: relative;
+}
+.pitem-segs i.on { background: var(--c, var(--accent)); }
+.pitem-segs i.thr::after {
+  content: ''; position: absolute; right: -1px; top: -2px; bottom: -2px;
+  width: 1px; background: var(--muted);
+}
+.pitem-count { flex-shrink: 0; font-variant-numeric: tabular-nums; }
+
+/* En partie : l'état se lit à la carte, pas à un mot. Un liseré seul
+   est trop discret sur une colonne de huit lignes ; le fond très
+   légèrement teinté le rend lisible à un mètre sans faire de bruit. */
+.pitem.done { border-color: var(--ok); background: rgba(6,214,160,.07); }
+.pitem.offline { opacity: .45; }
+
+/* Actions révélées au survol : deux icônes sur chacune des lignes
+   faisaient une colonne de boutons plus voyante que les noms. Sur écran
+   tactile, où le survol n'existe pas, elles restent affichées. */
+.pitem-acts { display: flex; gap: .15rem; opacity: 0; transition: opacity .15s; }
+.pitem:hover .pitem-acts, .pitem:focus-within .pitem-acts { opacity: 1; }
+@media (pointer: coarse) { .pitem-acts { opacity: 1; } }
+
+/* ── Pied : rejoindre la soirée ──
+   Code et QR se cherchent en regardant qui manque à l'appel, donc ici.
+   Repliable dans le lecteur, où l'on n'en a besoin qu'en cas de pépin ;
+   ouvert dans la console, où c'est le geste du moment. */
+.rejoin { border-top: 1px solid var(--border); flex-shrink: 0; }
+.rejoin > summary {
+  padding: .6rem .9rem; cursor: pointer; list-style: none;
+  font-size: var(--t-micro); letter-spacing: .18em; text-transform: uppercase;
+  color: var(--muted); user-select: none;
+}
+.rejoin > summary::-webkit-details-marker { display: none; }
+.rejoin > summary::after { content: ' ▾'; }
+.rejoin[open] > summary::after { content: ' ▴'; }
+.rejoin > summary:hover { color: var(--text); }
+.rejoin-body { padding: 0 .9rem .9rem; text-align: center; }
+.rejoin-code {
+  font-family: 'Bebas Neue', sans-serif; font-size: 2rem; color: var(--accent);
+  /* Demi-valeur du letter-spacing, pour recentrer. */
+  letter-spacing: .22em; text-indent: .11em; line-height: 1.1;
+}
+.rejoin-qr img {
+  display: block; margin: .6rem auto 0; background: #fff;
+  border-radius: var(--r-sm); padding: .3rem; width: 100%; max-width: 8.5rem; height: auto;
+}
+.rejoin-qr .fallback { font-size: var(--t-micro); color: var(--muted); }
+
+/* ════════════════════════════════════════════════════════════════
    BARRE DU HAUT — un seul composant pour toutes les vues
    ════════════════════════════════════════════════════════════════
 

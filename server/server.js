@@ -165,7 +165,7 @@ app.get('/player',         page('player'));
 
 // ─── Statique ──────────────────────────────────────────────────
 
-for (const dir of ['shared', 'home', 'host', 'play', 'player', 'prepare', 'admin', 'login']) {
+for (const dir of ['shared', 'home', 'host', 'play', 'player', 'admin', 'login']) {
   app.use(`/${dir}`, express.static(path.join(PUBLIC, dir)));
 }
 

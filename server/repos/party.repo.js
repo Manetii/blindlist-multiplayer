@@ -23,7 +23,7 @@ const PUBLIC_COLUMNS = `
   auto_reveal_on_all_votes, auto_advance_on_all_ready,
   allow_self_registration,
   rule_bluffer_enabled, rule_trapper_enabled, hide_indices_default,
-  key_moment_pct,
+  key_moment_pct, source_mode,
   created_at, last_activity_at, locked_at, archived_at
 `;
 
@@ -50,8 +50,9 @@ async function create({ name, minTracks = 3, maxTracks = 6, settings = {} }) {
             min_tracks_per_person, max_tracks_per_person,
             auto_reveal_on_all_votes, auto_advance_on_all_ready,
             allow_self_registration, rule_bluffer_enabled,
-            rule_trapper_enabled, hide_indices_default, key_moment_pct)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+            rule_trapper_enabled, hide_indices_default, key_moment_pct,
+            source_mode)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
          RETURNING ${PUBLIC_COLUMNS}`,
         [
           code,
@@ -66,6 +67,7 @@ async function create({ name, minTracks = 3, maxTracks = 6, settings = {} }) {
           settings.trapperRule === true,
           settings.hideIndices !== false,
           clampInt(settings.keyMomentPct, 25, 0, 50),
+          settings.sourceMode === 'youtube' ? 'youtube' : 'fichiers',
         ]
       );
       return { party: row, hostToken };
@@ -300,6 +302,7 @@ const MUTABLE_SETTINGS = {
   keyMomentPct:     { column: 'key_moment_pct',            type: 'int', min: 0, max: 50 },
   minTracks:        { column: 'min_tracks_per_person',     type: 'int', min: 1, max: 50 },
   maxTracks:        { column: 'max_tracks_per_person',     type: 'int', min: 1, max: 50 },
+  sourceMode:       { column: 'source_mode',               type: 'enum', values: ['fichiers', 'youtube'] },
 };
 
 /** Entier borné, ou `fallback` si la valeur n'en est pas un. */
@@ -359,6 +362,22 @@ async function updateSettings(partyId, settings = {}) {
     }
   }
 
+  // Le mode d'alimentation ne se corrige que tant que rien n'a été
+  // collecté : un panier constitué dans un mode n'a pas d'équivalent
+  // dans l'autre, et basculer effacerait le travail déjà fait.
+  if (settings.sourceMode !== undefined) {
+    const { n } = await db.one(
+      `SELECT count(*)::int AS n FROM tracks WHERE party_id = $1`, [partyId]);
+    if (n > 0) {
+      return {
+        ok: false,
+        conflict: 'source_mode_locked',
+        error: `Impossible de changer de mode : ${n} morceau${n > 1 ? 'x ont' : ' a'} `
+             + 'déjà été proposé. Les paniers seraient perdus.',
+      };
+    }
+  }
+
   const sets = [];
   const values = [partyId];
 
@@ -367,7 +386,10 @@ async function updateSettings(partyId, settings = {}) {
     if (raw === undefined) continue;
 
     let value;
-    if (spec.type === 'bool') {
+    if (spec.type === 'enum') {
+      if (!spec.values.includes(raw)) continue;
+      value = raw;
+    } else if (spec.type === 'bool') {
       // Un réglage booléen ne s'écrit que sur un vrai booléen : accepter
       // 'false' ou 0 ouvrirait la porte aux surprises de coercition.
       if (typeof raw !== 'boolean') continue;
